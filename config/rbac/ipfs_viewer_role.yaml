@@ -1,0 +1,20 @@
+# permissions for end users to view ipfs.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ipfs-viewer-role
+rules:
+- apiGroups:
+  - cache.ipfs.io
+  resources:
+  - ipfs
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - cache.ipfs.io
+  resources:
+  - ipfs/status
+  verbs:
+  - get

@@ -1,4 +1,4 @@
 ## Append samples you want in your CSV to this file as resources ##
 resources:
-- cache_v1alpha1_ipfs.yaml
+- cluster_v1alpha1_ipfs.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples

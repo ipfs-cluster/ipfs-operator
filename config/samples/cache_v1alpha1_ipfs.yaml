@@ -1,6 +1,0 @@
-apiVersion: cache.ipfs.io/v1alpha1
-kind: Ipfs
-metadata:
-  name: ipfs-sample
-spec:
-  # TODO(user): Add fields here

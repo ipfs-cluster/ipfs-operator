@@ -11,7 +11,7 @@ metadata:
             "name": "ipfs-sample"
           },
           "spec": {
-            "replicas": 3
+            "replicas": 1
           }
         }
       ]
@@ -64,18 +64,6 @@ spec:
           - update
           - watch
         - apiGroups:
-          - batch
-          resources:
-          - jobs
-          verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
-        - apiGroups:
           - cluster.ipfs.io
           resources:
           - ipfs
@@ -105,18 +93,6 @@ spec:
           - ""
           resources:
           - persistentvolumeclaims
-          verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
-        - apiGroups:
-          - ""
-          resources:
-          - secrets
           verbs:
           - create
           - delete

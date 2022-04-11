@@ -3,4 +3,4 @@ kind: Ipfs
 metadata:
   name: ipfs-sample
 spec:
-  replicas: 3
+  replicas: 1

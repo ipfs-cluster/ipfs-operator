@@ -28,7 +28,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -53,11 +52,9 @@ type IpfsReconciler struct {
 //+kubebuilder:rbac:groups=cluster.ipfs.io,resources=ipfs,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=cluster.ipfs.io,resources=ipfs/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=cluster.ipfs.io,resources=ipfs/finalizers,verbs=update
-//+kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterrolebindings,verbs=get;list;watch;create;update;patch;delete
@@ -119,11 +116,11 @@ func (r *IpfsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	}
 
 	// Check if statefulset already exists, if not create a new one
-	foundSS := &appsv1.StatefulSet{}
-	if err := r.Get(ctx, types.NamespacedName{Name: "ipfs-cluster-" + instance.Name, Namespace: instance.Namespace}, foundSS); err != nil {
+	foundiSS := &appsv1.StatefulSet{}
+	if err := r.Get(ctx, types.NamespacedName{Name: "ipfs-" + instance.Name, Namespace: instance.Namespace}, foundiSS); err != nil {
 		if errors.IsNotFound(err) {
 			// Define a new statefulset
-			statefulSet := r.ssGenerate(instance)
+			statefulSet := r.iSSGenerate(instance)
 			log.Info("Creating a new StatefulSet", "StatefulSet.Namespace", statefulSet.Namespace, "StatefulSet.Name", statefulSet.Name)
 			if err := r.Create(ctx, statefulSet); err != nil {
 				log.Error(err, "Failed to create new StatefulSet", "statefulSet.Namespace", statefulSet.Namespace, "statefulSet.Name", statefulSet.Name)
@@ -131,7 +128,37 @@ func (r *IpfsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 				return ctrl.Result{}, err
 			}
 			if err := wait.Poll(time.Second*1, time.Second*15, func() (done bool, err error) {
-				if err := r.Get(ctx, types.NamespacedName{Name: "ipfs-cluster-" + instance.Name, Namespace: instance.Namespace}, foundSS); err != nil {
+				if err := r.Get(ctx, types.NamespacedName{Name: "ipfs-" + instance.Name, Namespace: instance.Namespace}, foundiSS); err != nil {
+					if errors.IsNotFound(err) {
+						return false, nil
+					} else {
+						return false, err
+					}
+				}
+				return true, nil
+			}); err != nil {
+				return ctrl.Result{}, err
+			}
+			// StatefulSet created successfully - return and requeue
+			return ctrl.Result{Requeue: true}, nil
+		}
+		log.Error(err, "Failed to get StatefulSet")
+	}
+
+	// Check if statefulset already exists, if not create a new one
+	foundcSS := &appsv1.StatefulSet{}
+	if err := r.Get(ctx, types.NamespacedName{Name: "cluster-" + instance.Name, Namespace: instance.Namespace}, foundcSS); err != nil {
+		if errors.IsNotFound(err) {
+			// Define a new statefulset
+			statefulSet := r.cSSGenerate(instance)
+			log.Info("Creating a new StatefulSet", "StatefulSet.Namespace", statefulSet.Namespace, "StatefulSet.Name", statefulSet.Name)
+			if err := r.Create(ctx, statefulSet); err != nil {
+				log.Error(err, "Failed to create new StatefulSet", "statefulSet.Namespace", statefulSet.Namespace, "statefulSet.Name", statefulSet.Name)
+
+				return ctrl.Result{}, err
+			}
+			if err := wait.Poll(time.Second*1, time.Second*15, func() (done bool, err error) {
+				if err := r.Get(ctx, types.NamespacedName{Name: "cluster-" + instance.Name, Namespace: instance.Namespace}, foundcSS); err != nil {
 					if errors.IsNotFound(err) {
 						return false, nil
 					} else {
@@ -178,20 +205,20 @@ func (r *IpfsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		log.Error(err, "Failed to get Service Account")
 	}
 
-	// Check if configmap already exists, if not create a new one
-	foundConfigMap := &corev1.ConfigMap{}
-	if err := r.Get(ctx, types.NamespacedName{Name: "ipfs-cluster-" + instance.Name, Namespace: instance.Namespace}, foundConfigMap); err != nil {
+	// Check if the service already exists, if not create a new one
+	foundService := &corev1.Service{}
+	if err := r.Get(ctx, types.NamespacedName{Name: "cluster-0-ipfs-cluster-" + instance.Name, Namespace: instance.Namespace}, foundService); err != nil {
 		if errors.IsNotFound(err) {
-			// Define a new configmap
-			configMap := r.cmGenerate(instance)
-			log.Info("Creating a new ConfigMap", "configMap.Namespace", configMap.Namespace, "configMap.Name", configMap.Name)
-			if err := r.Create(ctx, configMap); err != nil {
-				log.Error(err, "Failed to create a ConfigMap", "configMap.Namespace", configMap.Namespace, "configMap.Name", configMap.Name)
+			// Define a new service
+			service := r.csvcGenerate(instance)
+			log.Info("Creating a new Service", "service.Namespace", service.Namespace, "service.Name", service.Name)
+			if err := r.Create(ctx, service); err != nil {
+				log.Error(err, "Failed to create a Service", "service.Namespace", service.Namespace, "service.Name", service.Name)
 
 				return ctrl.Result{}, err
 			}
 			if err := wait.Poll(time.Second*1, time.Second*15, func() (done bool, err error) {
-				if err := r.Get(ctx, types.NamespacedName{Name: "ipfs-cluster-" + instance.Name, Namespace: instance.Namespace}, foundConfigMap); err != nil {
+				if err := r.Get(ctx, types.NamespacedName{Name: "cluster-0-ipfs-cluster-" + instance.Name, Namespace: instance.Namespace}, foundService); err != nil {
 					if errors.IsNotFound(err) {
 						return false, nil
 					} else {
@@ -202,48 +229,18 @@ func (r *IpfsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 			}); err != nil {
 				return ctrl.Result{}, err
 			}
-			// Configmap created successfully - return and requeue
+			// Service created successfully - return and requeue
 			return ctrl.Result{Requeue: true}, nil
 		}
-		log.Error(err, "Failed to get ConfigMap")
-	}
-
-	// Check if secret already exists, if not create a new one
-	foundSecret := &corev1.Secret{}
-	if err := r.Get(ctx, types.NamespacedName{Name: "ipfs-cluster-" + instance.Name, Namespace: instance.Namespace}, foundSecret); err != nil {
-		if errors.IsNotFound(err) {
-			// Define a new secret
-			secret := r.secretGenerate(instance)
-			log.Info("Creating a new Secret", "secret.Namespace", secret.Namespace, "secret.Name", secret.Name)
-			if err := r.Create(ctx, secret); err != nil {
-				log.Error(err, "Failed to create a Secret", "secret.Namespace", secret.Namespace, "secret.Name", secret.Name)
-
-				return ctrl.Result{}, err
-			}
-			if err := wait.Poll(time.Second*1, time.Second*15, func() (done bool, err error) {
-				if err := r.Get(ctx, types.NamespacedName{Name: "ipfs-cluster-" + instance.Name, Namespace: instance.Namespace}, foundSecret); err != nil {
-					if errors.IsNotFound(err) {
-						return false, nil
-					} else {
-						return false, err
-					}
-				}
-				return true, nil
-			}); err != nil {
-				return ctrl.Result{}, err
-			}
-			// Secret created successfully - return and requeue
-			return ctrl.Result{Requeue: true}, nil
-		}
-		log.Error(err, "Failed to get Secret")
+		log.Error(err, "Failed to get Service")
 	}
 
 	// Check if the service already exists, if not create a new one
-	foundService := &corev1.Service{}
-	if err := r.Get(ctx, types.NamespacedName{Name: "ipfs-cluster-" + instance.Name, Namespace: instance.Namespace}, foundService); err != nil {
+	foundipfsService := &corev1.Service{}
+	if err := r.Get(ctx, types.NamespacedName{Name: "ipfs-cluster-" + instance.Name, Namespace: instance.Namespace}, foundipfsService); err != nil {
 		if errors.IsNotFound(err) {
 			// Define a new service
-			service := r.svcGenerate(instance)
+			service := r.isvcGenerate(instance)
 			log.Info("Creating a new Service", "service.Namespace", service.Namespace, "service.Name", service.Name)
 			if err := r.Create(ctx, service); err != nil {
 				log.Error(err, "Failed to create a Service", "service.Namespace", service.Namespace, "service.Name", service.Name)
@@ -282,27 +279,22 @@ func (r *IpfsReconciler) CleanUpOpjects(ctx context.Context, instance *clusterv1
 		return err
 	}
 
-	err = r.Delete(ctx, &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "ipfs-cluster-" + instance.Name, Namespace: instance.Namespace}})
-	if err != nil && !(errors.IsGone(err) || errors.IsNotFound(err)) {
-		return err
-	}
-
-	err = r.Delete(ctx, &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "ipfs-cluster-" + instance.Name, Namespace: instance.Namespace}})
-	if err != nil && !(errors.IsGone(err) || errors.IsNotFound(err)) {
-		return err
-	}
-
-	err = r.Delete(ctx, &appsv1.StatefulSet{ObjectMeta: metav1.ObjectMeta{Name: "ipfs-cluster-" + instance.Name, Namespace: instance.Namespace}})
-	if err != nil && !(errors.IsGone(err) || errors.IsNotFound(err)) {
-		return err
-	}
-
-	err = r.Delete(ctx, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "ipfs-cluster-" + instance.Name, Namespace: instance.Namespace}})
+	err = r.Delete(ctx, &appsv1.StatefulSet{ObjectMeta: metav1.ObjectMeta{Name: "ipfs-" + instance.Name, Namespace: instance.Namespace}})
 	if err != nil && !(errors.IsGone(err) || errors.IsNotFound(err)) {
 		return err
 	}
 
 	err = r.Delete(ctx, &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "ipfs-cluster-" + instance.Name, Namespace: instance.Namespace}})
+	if err != nil && !(errors.IsGone(err) || errors.IsNotFound(err)) {
+		return err
+	}
+
+	err = r.Delete(ctx, &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "cluster-0-ipfs-cluster-" + instance.Name, Namespace: instance.Namespace}})
+	if err != nil && !(errors.IsGone(err) || errors.IsNotFound(err)) {
+		return err
+	}
+
+	err = r.Delete(ctx, &appsv1.StatefulSet{ObjectMeta: metav1.ObjectMeta{Name: "cluster-" + instance.Name, Namespace: instance.Namespace}})
 	if err != nil && !(errors.IsGone(err) || errors.IsNotFound(err)) {
 		return err
 	}
@@ -322,94 +314,39 @@ func (r *IpfsReconciler) saGenerate(m *clusterv1alpha1.Ipfs) *corev1.ServiceAcco
 	ctrl.SetControllerReference(m, serviceAcct, r.Scheme)
 	return serviceAcct
 }
-func (r *IpfsReconciler) cmGenerate(m *clusterv1alpha1.Ipfs) *corev1.ConfigMap {
-	// Define a new ConfigMap object
-	configMap := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "ipfs-cluster-" + m.Name,
-			Namespace: m.Namespace,
-		},
-		Data: map[string]string{
-			"bootstrap-peer-id": "blah",
-		},
-	}
-	// ConfigMap reconcile finished
-	ctrl.SetControllerReference(m, configMap, r.Scheme)
-	return configMap
-}
-
-// Generate the secret for the ipfs cluster
-func (r *IpfsReconciler) secretGenerate(m *clusterv1alpha1.Ipfs) *corev1.Secret {
-	// Define a new Secret object
-	secret := &corev1.Secret{
-		TypeMeta:   metav1.TypeMeta{},
-		ObjectMeta: metav1.ObjectMeta{Name: "ipfs-cluster-" + m.Name, Namespace: m.Namespace},
-		Immutable:  new(bool),
-		Data: map[string][]byte{
-			"cluster-secret":          []byte("blah"),
-			"bootstrap-peer-priv-key": []byte("blah"),
-		},
-		StringData: map[string]string{},
-		Type:       corev1.SecretTypeOpaque,
-	}
-	// Secret reconcile finished
-	ctrl.SetControllerReference(m, secret, r.Scheme)
-	return secret
-}
 
 // Generate the statefulset object
-func (r *IpfsReconciler) ssGenerate(m *clusterv1alpha1.Ipfs) *appsv1.StatefulSet {
+func (r *IpfsReconciler) iSSGenerate(m *clusterv1alpha1.Ipfs) *appsv1.StatefulSet {
 	// Define a new StatefulSet object
 	ss := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "ipfs-cluster-" + m.Name,
+			Name:      "ipfs-" + m.Name,
 			Namespace: m.Namespace,
 		},
 		Spec: appsv1.StatefulSetSpec{
 			Replicas: &m.Spec.Replicas,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					"app": "ipfs-cluster-" + m.Name,
+					"app.kubernetes.io/name":     "ipfs-cluster-" + m.Name,
+					"app.kubernetes.io/instance": "ipfs-cluster-" + m.Name,
+					"nodeType":                   "ipfs",
 				},
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						"app": "ipfs-cluster-" + m.Name,
+						"app.kubernetes.io/name":     "ipfs-cluster-" + m.Name,
+						"app.kubernetes.io/instance": "ipfs-cluster-" + m.Name,
+						"nodeType":                   "ipfs",
 					},
 				},
 				Spec: corev1.PodSpec{
-					InitContainers: []corev1.Container{
-						{
-							Name:  "configure-ipfs",
-							Image: "ipfs/go-ipfs:v0.4.18",
-							Command: []string{
-								"/bin/sh",
-								"/custom/configure-ipfs.sh",
-							},
-							VolumeMounts: []corev1.VolumeMount{
-								{
-									Name:      "ipfs-storage",
-									MountPath: "/data/ipfs",
-								},
-								{
-									Name:      "configure-script",
-									MountPath: "/custom",
-								},
-							},
-						},
-					},
+					ServiceAccountName: "ipfs-cluster-" + m.Name,
 					Containers: []corev1.Container{
 						{
 							Name:            "ipfs",
-							Image:           "ipfs/go-ipfs:v0.4.18",
-							ImagePullPolicy: corev1.PullIfNotPresent,
-							Env: []corev1.EnvVar{
-								{
-									Name:  "IPFS_FD_MAX",
-									Value: "4096",
-								},
-							},
+							Image:           "quay.io/rcook/ipfs-mirror:go-ipfs",
+							ImagePullPolicy: corev1.PullAlways,
 							Ports: []corev1.ContainerPort{
 								{
 									Name:          "swarm",
@@ -417,8 +354,8 @@ func (r *IpfsReconciler) ssGenerate(m *clusterv1alpha1.Ipfs) *appsv1.StatefulSet
 									Protocol:      corev1.ProtocolTCP,
 								},
 								{
-									Name:          "swarm-udp",
-									ContainerPort: 4002,
+									Name:          "zeroconf",
+									ContainerPort: 5353,
 									Protocol:      corev1.ProtocolUDP,
 								},
 								{
@@ -427,128 +364,15 @@ func (r *IpfsReconciler) ssGenerate(m *clusterv1alpha1.Ipfs) *appsv1.StatefulSet
 									Protocol:      corev1.ProtocolTCP,
 								},
 								{
-									Name:          "ws",
-									ContainerPort: 8081,
-									Protocol:      corev1.ProtocolTCP,
-								},
-								{
 									Name:          "http",
 									ContainerPort: 8080,
 									Protocol:      corev1.ProtocolTCP,
 								},
 							},
-							LivenessProbe: &corev1.Probe{
-								ProbeHandler: corev1.ProbeHandler{
-									TCPSocket: &corev1.TCPSocketAction{
-										Port: intstr.IntOrString{
-											StrVal: "swarm",
-										},
-									},
-								},
-								InitialDelaySeconds: 30,
-								TimeoutSeconds:      5,
-								PeriodSeconds:       15,
-							},
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      "ipfs-storage",
 									MountPath: "/data/ipfs",
-								},
-								{
-									Name:      "configure-script",
-									MountPath: "/custom",
-								},
-							},
-						},
-						{
-							Name:            "ipfs-cluster-" + m.Name,
-							Image:           "ipfs/go-ipfs:v0.4.18",
-							ImagePullPolicy: corev1.PullIfNotPresent,
-							Command: []string{
-								"/bin/sh",
-								"/custom/entrypoint.sh",
-							},
-							EnvFrom: []corev1.EnvFromSource{
-								{
-									ConfigMapRef: &corev1.ConfigMapEnvSource{
-										LocalObjectReference: corev1.LocalObjectReference{
-											Name: "env-config",
-										},
-									},
-								},
-							},
-							Env: []corev1.EnvVar{
-								{
-									Name: "BOOTSTRAP_PEER_ID",
-									ValueFrom: &corev1.EnvVarSource{
-										ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
-											LocalObjectReference: corev1.LocalObjectReference{
-												Name: "env-config",
-											},
-											Key: "bootstrap-peer-id",
-										},
-									},
-								},
-								{
-									Name: "BOOTSTRAP_PEER_PRIV_KEY",
-									ValueFrom: &corev1.EnvVarSource{
-										SecretKeyRef: &corev1.SecretKeySelector{
-											LocalObjectReference: corev1.LocalObjectReference{
-												Name: "secret-config",
-											},
-											Key: "bootstrap-peer-priv-key",
-										},
-									},
-								},
-								{
-									Name: "ClusterSecret",
-									ValueFrom: &corev1.EnvVarSource{
-										SecretKeyRef: &corev1.SecretKeySelector{
-											LocalObjectReference: corev1.LocalObjectReference{
-												Name: "secret-config",
-											},
-											Key: "cluster-secret",
-										},
-									},
-								},
-							},
-							Ports: []corev1.ContainerPort{
-								{
-									Name:          "api-http",
-									ContainerPort: 9094,
-									Protocol:      corev1.ProtocolTCP,
-								},
-								{
-									Name:          "proxy-http",
-									ContainerPort: 9095,
-									Protocol:      corev1.ProtocolTCP,
-								},
-								{
-									Name:          "cluster-swarm",
-									ContainerPort: 9096,
-									Protocol:      corev1.ProtocolTCP,
-								},
-							},
-							LivenessProbe: &corev1.Probe{
-								ProbeHandler: corev1.ProbeHandler{
-									TCPSocket: &corev1.TCPSocketAction{
-										Port: intstr.IntOrString{
-											StrVal: "cluster-swarm",
-										},
-									},
-								},
-								InitialDelaySeconds: 5,
-								TimeoutSeconds:      5,
-								PeriodSeconds:       10,
-							},
-							VolumeMounts: []corev1.VolumeMount{
-								{
-									Name:      "cluster-storage",
-									MountPath: "/data/ipfs-cluster",
-								},
-								{
-									Name:      "configure-script",
-									MountPath: "/custom",
 								},
 							},
 						},
@@ -556,21 +380,6 @@ func (r *IpfsReconciler) ssGenerate(m *clusterv1alpha1.Ipfs) *appsv1.StatefulSet
 				},
 			},
 			VolumeClaimTemplates: []corev1.PersistentVolumeClaim{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "cluster-storage",
-					},
-					Spec: corev1.PersistentVolumeClaimSpec{
-						AccessModes: []corev1.PersistentVolumeAccessMode{
-							corev1.ReadWriteOnce,
-						},
-						Resources: corev1.ResourceRequirements{
-							Requests: corev1.ResourceList{
-								corev1.ResourceStorage: resource.MustParse("1Gi"),
-							},
-						},
-					},
-				},
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "ipfs-storage",
@@ -587,7 +396,7 @@ func (r *IpfsReconciler) ssGenerate(m *clusterv1alpha1.Ipfs) *appsv1.StatefulSet
 					},
 				},
 			},
-			ServiceName:                          "ipfs-cluster-" + m.Name,
+			ServiceName:                          "ipfs-" + m.Name,
 			PodManagementPolicy:                  "",
 			UpdateStrategy:                       appsv1.StatefulSetUpdateStrategy{},
 			RevisionHistoryLimit:                 new(int32),
@@ -600,28 +409,169 @@ func (r *IpfsReconciler) ssGenerate(m *clusterv1alpha1.Ipfs) *appsv1.StatefulSet
 	return ss
 }
 
-func (r *IpfsReconciler) svcGenerate(m *clusterv1alpha1.Ipfs) *corev1.Service {
+// Generate the statefulset object
+func (r *IpfsReconciler) cSSGenerate(m *clusterv1alpha1.Ipfs) *appsv1.StatefulSet {
+	// Define a new StatefulSet object
+	ss := &appsv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "cluster-" + m.Name,
+			Namespace: m.Namespace,
+		},
+		Spec: appsv1.StatefulSetSpec{
+			Replicas: &m.Spec.Replicas,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"app.kubernetes.io/name":     "ipfs-cluster-" + m.Name,
+					"app.kubernetes.io/instance": "ipfs-cluster-" + m.Name,
+					"nodeType":                   "cluster",
+				},
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"app.kubernetes.io/name":     "ipfs-cluster-" + m.Name,
+						"app.kubernetes.io/instance": "ipfs-cluster-" + m.Name,
+						"nodeType":                   "cluster",
+					},
+				},
+				Spec: corev1.PodSpec{
+					ServiceAccountName: "ipfs-cluster-" + m.Name,
+					Containers: []corev1.Container{
+						{
+							Name: "cluster-" + m.Name,
+							Env: []corev1.EnvVar{
+								{
+									Name:  "CLUSTER_PEERNAME",
+									Value: "cluster-0",
+								},
+								{
+									Name:  "CLUSTER_IPFSHTTP_NODEMULTIADDRESS",
+									Value: "/dns4/cluster-" + m.Name + "." + m.Namespace + ".svc.cluster.local/tcp/5001",
+								},
+								{
+									Name:  "CLUSTER_CRDT_TRUSTEDPEERS",
+									Value: "*",
+								},
+								{
+									Name:  "CLUSTER_RESTAPI_HTTPLISTENMULTIADDRESS",
+									Value: "/ip4/0.0.0.0/tcp/9094",
+								},
+								{
+									Name:  "CLUSTER_MONITORPINGINTERVAL",
+									Value: "2s",
+								},
+							},
+							Image:           "quay.io/rcook/ipfs-mirror:cluster",
+							ImagePullPolicy: corev1.PullAlways,
+							Ports: []corev1.ContainerPort{
+								{
+									Name:          "p2p",
+									ContainerPort: 9096,
+									Protocol:      corev1.ProtocolTCP,
+								},
+							},
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "ipfs-storage",
+									MountPath: "/data/ipfs-cluster",
+								},
+							},
+						},
+					},
+				},
+			},
+			VolumeClaimTemplates: []corev1.PersistentVolumeClaim{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "ipfs-storage",
+					},
+					Spec: corev1.PersistentVolumeClaimSpec{
+						AccessModes: []corev1.PersistentVolumeAccessMode{
+							corev1.ReadWriteOnce,
+						},
+						Resources: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{
+								corev1.ResourceStorage: resource.MustParse("1Gi"),
+							},
+						},
+					},
+				},
+			},
+			ServiceName:                          "cluster-" + m.Name,
+			PodManagementPolicy:                  "",
+			UpdateStrategy:                       appsv1.StatefulSetUpdateStrategy{},
+			RevisionHistoryLimit:                 new(int32),
+			MinReadySeconds:                      0,
+			PersistentVolumeClaimRetentionPolicy: &appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{},
+		},
+	}
+	// StatefulSet reconcile finished
+	ctrl.SetControllerReference(m, ss, r.Scheme)
+	return ss
+}
+
+func (r *IpfsReconciler) csvcGenerate(m *clusterv1alpha1.Ipfs) *corev1.Service {
+	// Define a new service and generate secret
+	service := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "cluster-" + m.Name,
+			Namespace: m.Namespace,
+			Labels: map[string]string{
+				"app.kubernetes.io/name":     "ipfs-cluster-" + m.Name,
+				"app.kubernetes.io/instance": "ipfs-cluster-" + m.Name,
+				"nodeType":                   "cluster",
+			},
+		},
+		Spec: corev1.ServiceSpec{
+			Ports: []corev1.ServicePort{
+				{
+					Port: 9096,
+					Name: "p2p",
+				},
+			},
+			Selector: map[string]string{
+				"app.kubernetes.io/name":     "ipfs-cluster-" + m.Name,
+				"app.kubernetes.io/instance": "ipfs-cluster-" + m.Name,
+				"nodeType":                   "cluster",
+			},
+		},
+	}
+	// Service reconcile finished
+	ctrl.SetControllerReference(m, service, r.Scheme)
+	return service
+}
+
+func (r *IpfsReconciler) isvcGenerate(m *clusterv1alpha1.Ipfs) *corev1.Service {
 	// Define a new service and generate secret
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "ipfs-cluster-" + m.Name,
 			Namespace: m.Namespace,
+			Labels: map[string]string{
+				"app.kubernetes.io/name":     "ipfs-cluster-" + m.Name,
+				"app.kubernetes.io/instance": "ipfs-cluster-" + m.Name,
+				"nodeType":                   "ipfs",
+			},
 		},
 		Spec: corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{
 				{
-					Port: 8080,
-					Name: "primer",
+					Port: 4001,
+					Name: "swarm",
 				},
 				{
-					Port: 8888,
-					Name: "oauth-proxy",
+					Port: 5001,
+					Name: "api",
+				},
+				{
+					Port: 8080,
+					Name: "gateway",
 				},
 			},
 			Selector: map[string]string{
-				"app.kubernetes.io/name":      "ipfs-cluster-" + m.Name,
-				"app.kubernetes.io/component": "ipfs-cluster-" + m.Name,
-				"app.kubernetes.io/part-of":   "ipfs-cluster-" + m.Name,
+				"app.kubernetes.io/name":     "ipfs-cluster-" + m.Name,
+				"app.kubernetes.io/instance": "ipfs-cluster-" + m.Name,
+				"nodeType":                   "ipfs",
 			},
 		},
 	}
@@ -634,8 +584,9 @@ func (r *IpfsReconciler) svcGenerate(m *clusterv1alpha1.Ipfs) *corev1.Service {
 func (r *IpfsReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&clusterv1alpha1.Ipfs{}).
-		Owns(&batchv1.Job{}, builder.OnlyMetadata).
-		Owns(&appsv1.Deployment{}, builder.OnlyMetadata).
+		Owns(&appsv1.StatefulSet{}, builder.OnlyMetadata).
+		Owns(&corev1.Service{}, builder.OnlyMetadata).
+		Owns(&corev1.ServiceAccount{}, builder.OnlyMetadata).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: 5,
 		}).

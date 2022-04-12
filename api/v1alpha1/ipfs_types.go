@@ -32,7 +32,8 @@ const (
 )
 
 type IpfsSpec struct {
-	Replicas int32 `json:"replicas"`
+	URL            string `json:"url"`
+	ClusterStorage int64  `json:"clusterStorage"`
 }
 
 type IpfsStatus struct {

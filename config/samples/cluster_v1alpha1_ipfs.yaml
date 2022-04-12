@@ -1,6 +1,7 @@
 apiVersion: cluster.ipfs.io/v1alpha1
 kind: Ipfs
 metadata:
-  name: ipfs-sample
+  name: ipfs-sample-1
 spec:
-  replicas: 1
+  url: apps.ci-ln-2rhmsst-72292.origin-ci-int-gce.dev.rhcloud.com
+  clusterStorage: 5

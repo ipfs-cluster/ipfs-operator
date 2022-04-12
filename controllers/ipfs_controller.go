@@ -23,6 +23,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -61,6 +62,7 @@ type IpfsReconciler struct {
 //+kubebuilder:rbac:groups="",resources=users,verbs=impersonate
 //+kubebuilder:rbac:groups=route.openshift.io,resources=routes,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=*,resources=*,verbs=get;list
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -207,7 +209,7 @@ func (r *IpfsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 
 	// Check if the service already exists, if not create a new one
 	foundService := &corev1.Service{}
-	if err := r.Get(ctx, types.NamespacedName{Name: "cluster-0-ipfs-cluster-" + instance.Name, Namespace: instance.Namespace}, foundService); err != nil {
+	if err := r.Get(ctx, types.NamespacedName{Name: "cluster-" + instance.Name, Namespace: instance.Namespace}, foundService); err != nil {
 		if errors.IsNotFound(err) {
 			// Define a new service
 			service := r.csvcGenerate(instance)
@@ -218,7 +220,7 @@ func (r *IpfsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 				return ctrl.Result{}, err
 			}
 			if err := wait.Poll(time.Second*1, time.Second*15, func() (done bool, err error) {
-				if err := r.Get(ctx, types.NamespacedName{Name: "cluster-0-ipfs-cluster-" + instance.Name, Namespace: instance.Namespace}, foundService); err != nil {
+				if err := r.Get(ctx, types.NamespacedName{Name: "cluster-" + instance.Name, Namespace: instance.Namespace}, foundService); err != nil {
 					if errors.IsNotFound(err) {
 						return false, nil
 					} else {
@@ -233,6 +235,36 @@ func (r *IpfsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 			return ctrl.Result{Requeue: true}, nil
 		}
 		log.Error(err, "Failed to get Service")
+	}
+
+	// Check for ingress
+	foundIngress := &networkingv1.Ingress{}
+	if err := r.Get(ctx, types.NamespacedName{Name: "ipfs-" + instance.Name, Namespace: instance.Namespace}, foundIngress); err != nil {
+		if errors.IsNotFound(err) {
+			// Define a new service
+			ingress := r.ingressGenerate(instance)
+			log.Info("Creating a new Ingress", "ingress.Namespace", ingress.Namespace, "ingress.Name", ingress.Name)
+			if err := r.Create(ctx, ingress); err != nil {
+				log.Error(err, "Failed to create a Ingress", "ingress.Namespace", ingress.Namespace, "ingress.Name", ingress.Name)
+
+				return ctrl.Result{}, err
+			}
+			if err := wait.Poll(time.Second*1, time.Second*15, func() (done bool, err error) {
+				if err := r.Get(ctx, types.NamespacedName{Name: "ipfs-" + instance.Name, Namespace: instance.Namespace}, foundIngress); err != nil {
+					if errors.IsNotFound(err) {
+						return false, nil
+					} else {
+						return false, err
+					}
+				}
+				return true, nil
+			}); err != nil {
+				return ctrl.Result{}, err
+			}
+			// Service created successfully - return and requeue
+			return ctrl.Result{Requeue: true}, nil
+		}
+		log.Error(err, "Failed to get Ingress")
 	}
 
 	// Check if the service already exists, if not create a new one
@@ -318,13 +350,14 @@ func (r *IpfsReconciler) saGenerate(m *clusterv1alpha1.Ipfs) *corev1.ServiceAcco
 // Generate the statefulset object
 func (r *IpfsReconciler) iSSGenerate(m *clusterv1alpha1.Ipfs) *appsv1.StatefulSet {
 	// Define a new StatefulSet object
+	replacas := int32(1)
 	ss := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "ipfs-" + m.Name,
 			Namespace: m.Namespace,
 		},
 		Spec: appsv1.StatefulSetSpec{
-			Replicas: &m.Spec.Replicas,
+			Replicas: &replacas,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"app.kubernetes.io/name":     "ipfs-cluster-" + m.Name,
@@ -411,6 +444,7 @@ func (r *IpfsReconciler) iSSGenerate(m *clusterv1alpha1.Ipfs) *appsv1.StatefulSe
 
 // Generate the statefulset object
 func (r *IpfsReconciler) cSSGenerate(m *clusterv1alpha1.Ipfs) *appsv1.StatefulSet {
+	replacas := int32(1)
 	// Define a new StatefulSet object
 	ss := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -418,7 +452,7 @@ func (r *IpfsReconciler) cSSGenerate(m *clusterv1alpha1.Ipfs) *appsv1.StatefulSe
 			Namespace: m.Namespace,
 		},
 		Spec: appsv1.StatefulSetSpec{
-			Replicas: &m.Spec.Replicas,
+			Replicas: &replacas,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"app.kubernetes.io/name":     "ipfs-cluster-" + m.Name,
@@ -508,6 +542,50 @@ func (r *IpfsReconciler) cSSGenerate(m *clusterv1alpha1.Ipfs) *appsv1.StatefulSe
 	// StatefulSet reconcile finished
 	ctrl.SetControllerReference(m, ss, r.Scheme)
 	return ss
+}
+
+func (r *IpfsReconciler) ingressGenerate(m *clusterv1alpha1.Ipfs) *networkingv1.Ingress {
+	PathTypeImplementationSpecific := networkingv1.PathType("ImplementationSpecific")
+	ingress := &networkingv1.Ingress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "ipfs-" + m.Name,
+			Namespace: m.Namespace,
+			Labels: map[string]string{
+				"app.kubernetes.io/name":     "ipfs-cluster-" + m.Name,
+				"app.kubernetes.io/instance": "ipfs-cluster-" + m.Name,
+				"nodeType":                   "ipfs",
+			},
+		},
+		Spec: networkingv1.IngressSpec{
+			Rules: []networkingv1.IngressRule{
+				{
+					Host: "cluster-" + m.Namespace + m.Spec.URL,
+					IngressRuleValue: networkingv1.IngressRuleValue{
+						HTTP: &networkingv1.HTTPIngressRuleValue{
+							Paths: []networkingv1.HTTPIngressPath{
+								{
+									PathType: &PathTypeImplementationSpecific,
+
+									Path: "/",
+									Backend: networkingv1.IngressBackend{
+										Service: &networkingv1.IngressServiceBackend{
+											Name: "ipfs-cluster-" + m.Name,
+											Port: networkingv1.ServiceBackendPort{
+												Number: 8080,
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	// Service reconcile finished
+	ctrl.SetControllerReference(m, ingress, r.Scheme)
+	return ingress
 }
 
 func (r *IpfsReconciler) csvcGenerate(m *clusterv1alpha1.Ipfs) *corev1.Service {

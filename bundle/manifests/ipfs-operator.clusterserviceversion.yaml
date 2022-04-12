@@ -8,10 +8,11 @@ metadata:
           "apiVersion": "cluster.ipfs.io/v1alpha1",
           "kind": "Ipfs",
           "metadata": {
-            "name": "ipfs-sample"
+            "name": "ipfs-sample-1"
           },
           "spec": {
-            "replicas": 1
+            "clusterStorage": 5,
+            "url": "apps.ci-ln-2rhmsst-72292.origin-ci-int-gce.dev.rhcloud.com"
           }
         }
       ]
@@ -117,6 +118,18 @@ spec:
           - ""
           resources:
           - services
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - networking.k8s.io
+          resources:
+          - ingresses
           verbs:
           - create
           - delete

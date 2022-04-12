@@ -246,12 +246,8 @@ google.golang.org/appengine/internal/urlfetch
 google.golang.org/appengine/urlfetch
 # google.golang.org/genproto v0.0.0-20210831024726-fe130286e0e2
 ## explicit; go 1.11
-google.golang.org/genproto/googleapis/rpc/status
 # google.golang.org/grpc v1.40.0
 ## explicit; go 1.11
-google.golang.org/grpc/codes
-google.golang.org/grpc/internal/status
-google.golang.org/grpc/status
 # google.golang.org/protobuf v1.27.1
 ## explicit; go 1.9
 google.golang.org/protobuf/encoding/prototext
@@ -296,7 +292,7 @@ gopkg.in/yaml.v2
 # gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 ## explicit
 gopkg.in/yaml.v3
-# k8s.io/api v0.23.0
+# k8s.io/api v0.23.5
 ## explicit; go 1.16
 k8s.io/api/admission/v1
 k8s.io/api/admission/v1beta1
@@ -540,7 +536,6 @@ k8s.io/component-base/config
 k8s.io/component-base/config/v1alpha1
 # k8s.io/cri-api v0.23.5
 ## explicit; go 1.16
-k8s.io/cri-api/pkg/errors
 # k8s.io/klog/v2 v2.30.0
 ## explicit; go 1.13
 k8s.io/klog/v2

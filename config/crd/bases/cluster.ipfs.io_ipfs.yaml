@@ -34,11 +34,13 @@ spec:
             type: object
           spec:
             properties:
-              replicas:
-                format: int32
-                type: integer
+              clusterStorage:
+                type: string
+              url:
+                type: string
             required:
-            - replicas
+            - clusterStorage
+            - url
             type: object
           status:
             properties:

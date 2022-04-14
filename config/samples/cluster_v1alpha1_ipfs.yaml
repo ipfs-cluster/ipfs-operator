@@ -3,5 +3,4 @@ kind: Ipfs
 metadata:
   name: ipfs-sample-1
 spec:
-  url: apps.ci-ln-2rhmsst-72292.origin-ci-int-gce.dev.rhcloud.com
-  clusterStorage: 5
+  url: apps.cl1.octo-emerging.redhataicoe.com

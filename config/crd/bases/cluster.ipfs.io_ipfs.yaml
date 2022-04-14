@@ -34,12 +34,9 @@ spec:
             type: object
           spec:
             properties:
-              clusterStorage:
-                type: string
               url:
                 type: string
             required:
-            - clusterStorage
             - url
             type: object
           status:

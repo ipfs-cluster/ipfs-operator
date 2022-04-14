@@ -21,7 +21,6 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -301,17 +300,12 @@ func (r *IpfsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 
 func (r *IpfsReconciler) CleanUpOpjects(ctx context.Context, instance *clusterv1alpha1.Ipfs) error {
 	// Delete all the objects that we created to make sure that things are removed.
-	err := r.Delete(ctx, &batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "ipfs-cluster-" + instance.Name, Namespace: instance.Namespace}}, client.PropagationPolicy(metav1.DeletePropagationBackground))
+	err := r.Delete(ctx, &appsv1.StatefulSet{ObjectMeta: metav1.ObjectMeta{Name: "ipfs-" + instance.Name, Namespace: instance.Namespace}}, client.PropagationPolicy(metav1.DeletePropagationBackground))
 	if err != nil && !(errors.IsGone(err) || errors.IsNotFound(err)) {
 		return err
 	}
 
 	err = r.Delete(ctx, &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "ipfs-cluster-" + instance.Name, Namespace: instance.Namespace}})
-	if err != nil && !(errors.IsGone(err) || errors.IsNotFound(err)) {
-		return err
-	}
-
-	err = r.Delete(ctx, &appsv1.StatefulSet{ObjectMeta: metav1.ObjectMeta{Name: "ipfs-" + instance.Name, Namespace: instance.Namespace}})
 	if err != nil && !(errors.IsGone(err) || errors.IsNotFound(err)) {
 		return err
 	}

@@ -474,7 +474,7 @@ func (r *IpfsReconciler) cSSGenerate(m *clusterv1alpha1.Ipfs) *appsv1.StatefulSe
 								},
 								{
 									Name:  "CLUSTER_IPFSHTTP_NODEMULTIADDRESS",
-									Value: "/dns4/cluster-" + m.Name + "." + m.Namespace + ".svc.cluster.local/tcp/5001",
+									Value: "/dns4/ipfs-cluster-" + m.Name + "." + m.Namespace + ".svc.cluster.local/tcp/5001",
 								},
 								{
 									Name:  "CLUSTER_CRDT_TRUSTEDPEERS",

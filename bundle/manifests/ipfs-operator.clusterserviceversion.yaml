@@ -11,7 +11,7 @@ metadata:
             "name": "ipfs-sample-1"
           },
           "spec": {
-            "url": "apps.cl1.octo-emerging.redhataicoe.com"
+            "url": ".apps.jephilli-4-11-04-18-0635.devcluster.openshift.com"
           }
         }
       ]

@@ -34,9 +34,18 @@ spec:
             type: object
           spec:
             properties:
+              clusterStorage:
+                type: string
+              ipfsStorage:
+                type: string
+              public:
+                type: boolean
               url:
                 type: string
             required:
+            - clusterStorage
+            - ipfsStorage
+            - public
             - url
             type: object
           status:

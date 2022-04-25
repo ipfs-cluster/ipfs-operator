@@ -236,6 +236,38 @@ func (r *IpfsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		log.Error(err, "Failed to get Service")
 	}
 
+	// Check if the service already exists, if not create a new one
+	if instance.Spec.Public {
+		foundPublicService := &corev1.Service{}
+		if err := r.Get(ctx, types.NamespacedName{Name: "public-gateway-" + instance.Name, Namespace: instance.Namespace}, foundPublicService); err != nil {
+			if errors.IsNotFound(err) {
+				// Define a new service
+				service := r.pubSvcGenerate(instance)
+				log.Info("Creating a new Service", "service.Namespace", service.Namespace, "service.Name", service.Name)
+				if err := r.Create(ctx, service); err != nil {
+					log.Error(err, "Failed to create a Service", "service.Namespace", service.Namespace, "service.Name", service.Name)
+
+					return ctrl.Result{}, err
+				}
+				if err := wait.Poll(time.Second*1, time.Second*15, func() (done bool, err error) {
+					if err := r.Get(ctx, types.NamespacedName{Name: "public-gateway-" + instance.Name, Namespace: instance.Namespace}, foundPublicService); err != nil {
+						if errors.IsNotFound(err) {
+							return false, nil
+						} else {
+							return false, err
+						}
+					}
+					return true, nil
+				}); err != nil {
+					return ctrl.Result{}, err
+				}
+				// Service created successfully - return and requeue
+				return ctrl.Result{Requeue: true}, nil
+			}
+			log.Error(err, "Failed to get Service")
+		}
+	}
+
 	// Check for ingress
 	foundIngress := &networkingv1.Ingress{}
 	if err := r.Get(ctx, types.NamespacedName{Name: "ipfs-" + instance.Name, Namespace: instance.Namespace}, foundIngress); err != nil {
@@ -320,6 +352,21 @@ func (r *IpfsReconciler) CleanUpOpjects(ctx context.Context, instance *clusterv1
 		return err
 	}
 
+	err = r.Delete(ctx, &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "public-gateway-" + instance.Name, Namespace: instance.Namespace}})
+	if err != nil && !(errors.IsGone(err) || errors.IsNotFound(err)) {
+		return err
+	}
+
+	err = r.Delete(ctx, &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "ipfs-storage-cluster-" + instance.Name, Namespace: instance.Namespace}})
+	if err != nil && !(errors.IsGone(err) || errors.IsNotFound(err)) {
+		return err
+	}
+
+	err = r.Delete(ctx, &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "ipfs-storage-ipfs-" + instance.Name, Namespace: instance.Namespace}})
+	if err != nil && !(errors.IsGone(err) || errors.IsNotFound(err)) {
+		return err
+	}
+
 	err = r.Delete(ctx, &appsv1.StatefulSet{ObjectMeta: metav1.ObjectMeta{Name: "cluster-" + instance.Name, Namespace: instance.Namespace}})
 	if err != nil && !(errors.IsGone(err) || errors.IsNotFound(err)) {
 		return err
@@ -374,6 +421,12 @@ func (r *IpfsReconciler) iSSGenerate(m *clusterv1alpha1.Ipfs) *appsv1.StatefulSe
 							Name:            "ipfs",
 							Image:           "quay.io/rcook/ipfs-mirror:go-ipfs",
 							ImagePullPolicy: corev1.PullAlways,
+							Env: []corev1.EnvVar{
+								{
+									Name:  "IPFS_PROFILE",
+									Value: "flatfs",
+								},
+							},
 							Ports: []corev1.ContainerPort{
 								{
 									Name:          "swarm",
@@ -417,7 +470,7 @@ func (r *IpfsReconciler) iSSGenerate(m *clusterv1alpha1.Ipfs) *appsv1.StatefulSe
 						},
 						Resources: corev1.ResourceRequirements{
 							Requests: corev1.ResourceList{
-								corev1.ResourceStorage: resource.MustParse("1Gi"),
+								corev1.ResourceStorage: resource.MustParse(m.Spec.IpfsStorage),
 							},
 						},
 					},
@@ -519,7 +572,7 @@ func (r *IpfsReconciler) cSSGenerate(m *clusterv1alpha1.Ipfs) *appsv1.StatefulSe
 						},
 						Resources: corev1.ResourceRequirements{
 							Requests: corev1.ResourceList{
-								corev1.ResourceStorage: resource.MustParse("1Gi"),
+								corev1.ResourceStorage: resource.MustParse(m.Spec.ClusterStorage),
 							},
 						},
 					},
@@ -638,6 +691,38 @@ func (r *IpfsReconciler) isvcGenerate(m *clusterv1alpha1.Ipfs) *corev1.Service {
 				{
 					Port: 8080,
 					Name: "gateway",
+				},
+			},
+			Selector: map[string]string{
+				"app.kubernetes.io/name":     "ipfs-cluster-" + m.Name,
+				"app.kubernetes.io/instance": "ipfs-cluster-" + m.Name,
+				"nodeType":                   "ipfs",
+			},
+		},
+	}
+	// Service reconcile finished
+	ctrl.SetControllerReference(m, service, r.Scheme)
+	return service
+}
+
+func (r *IpfsReconciler) pubSvcGenerate(m *clusterv1alpha1.Ipfs) *corev1.Service {
+	// Define a new service and generate secret
+	service := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "public-gateway-" + m.Name,
+			Namespace: m.Namespace,
+			Labels: map[string]string{
+				"app.kubernetes.io/name":     "ipfs-cluster-" + m.Name,
+				"app.kubernetes.io/instance": "ipfs-cluster-" + m.Name,
+				"nodeType":                   "ipfs",
+			},
+		},
+		Spec: corev1.ServiceSpec{
+			Type: corev1.ServiceTypeLoadBalancer,
+			Ports: []corev1.ServicePort{
+				{
+					Port: 4001,
+					Name: "swarm",
 				},
 			},
 			Selector: map[string]string{

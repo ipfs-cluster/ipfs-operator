@@ -32,7 +32,10 @@ const (
 )
 
 type IpfsSpec struct {
-	URL string `json:"url"`
+	URL            string `json:"url"`
+	IpfsStorage    string `json:"ipfsStorage"`
+	ClusterStorage string `json:"clusterStorage"`
+	Public         bool   `json:"public"`
 }
 
 type IpfsStatus struct {

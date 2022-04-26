@@ -14,7 +14,7 @@ metadata:
             "clusterStorage": "2Gi",
             "ipfsStorage": "2Gi",
             "public": true,
-            "url": ".apps.jcaiani19.devcluster.openshift.com"
+            "url": ".apps.cl1.octo-emerging.redhataicoe.com"
           }
         }
       ]

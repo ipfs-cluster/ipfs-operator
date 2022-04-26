@@ -117,33 +117,35 @@ func (r *IpfsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	}
 
 	// Check if statefulset already exists, if not create a new one
-	foundiSS := &appsv1.StatefulSet{}
-	if err := r.Get(ctx, types.NamespacedName{Name: "ipfs-" + instance.Name, Namespace: instance.Namespace}, foundiSS); err != nil {
-		if errors.IsNotFound(err) {
-			// Define a new statefulset
-			statefulSet := r.iSSGenerate(instance)
-			log.Info("Creating a new StatefulSet", "StatefulSet.Namespace", statefulSet.Namespace, "StatefulSet.Name", statefulSet.Name)
-			if err := r.Create(ctx, statefulSet); err != nil {
-				log.Error(err, "Failed to create new StatefulSet", "statefulSet.Namespace", statefulSet.Namespace, "statefulSet.Name", statefulSet.Name)
+	if instance.Spec.Public && instance.Status.Address != "" || !instance.Spec.Public {
+		foundiSS := &appsv1.StatefulSet{}
+		if err := r.Get(ctx, types.NamespacedName{Name: "ipfs-" + instance.Name, Namespace: instance.Namespace}, foundiSS); err != nil {
+			if errors.IsNotFound(err) {
+				// Define a new statefulset
+				statefulSet := r.iSSGenerate(instance)
+				log.Info("Creating a new StatefulSet", "StatefulSet.Namespace", statefulSet.Namespace, "StatefulSet.Name", statefulSet.Name)
+				if err := r.Create(ctx, statefulSet); err != nil {
+					log.Error(err, "Failed to create new StatefulSet", "statefulSet.Namespace", statefulSet.Namespace, "statefulSet.Name", statefulSet.Name)
 
-				return ctrl.Result{}, err
-			}
-			if err := wait.Poll(time.Second*1, time.Second*15, func() (done bool, err error) {
-				if err := r.Get(ctx, types.NamespacedName{Name: "ipfs-" + instance.Name, Namespace: instance.Namespace}, foundiSS); err != nil {
-					if errors.IsNotFound(err) {
-						return false, nil
-					} else {
-						return false, err
-					}
+					return ctrl.Result{}, err
 				}
-				return true, nil
-			}); err != nil {
-				return ctrl.Result{}, err
+				if err := wait.Poll(time.Second*1, time.Second*15, func() (done bool, err error) {
+					if err := r.Get(ctx, types.NamespacedName{Name: "ipfs-" + instance.Name, Namespace: instance.Namespace}, foundiSS); err != nil {
+						if errors.IsNotFound(err) {
+							return false, nil
+						} else {
+							return false, err
+						}
+					}
+					return true, nil
+				}); err != nil {
+					return ctrl.Result{}, err
+				}
+				// StatefulSet created successfully - return and requeue
+				return ctrl.Result{Requeue: true}, nil
 			}
-			// StatefulSet created successfully - return and requeue
-			return ctrl.Result{Requeue: true}, nil
+			log.Error(err, "Failed to get StatefulSet")
 		}
-		log.Error(err, "Failed to get StatefulSet")
 	}
 
 	// Check if statefulset already exists, if not create a new one
@@ -266,6 +268,13 @@ func (r *IpfsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 			}
 			log.Error(err, "Failed to get Service")
 		}
+		if instance.Status.Address == "" {
+			instance.Status.Address = getServiceAddress(foundPublicService)
+			if err := r.Status().Update(ctx, instance); err != nil {
+				log.Error(err, "LB may not be ready yet, requeuing")
+				return ctrl.Result{Requeue: true}, nil
+			}
+		}
 	}
 
 	// Check for ingress
@@ -375,6 +384,22 @@ func (r *IpfsReconciler) CleanUpOpjects(ctx context.Context, instance *clusterv1
 	return nil
 }
 
+func getServiceAddress(svc *corev1.Service) string {
+	address := svc.Spec.ClusterIP
+	if svc.Spec.Type == corev1.ServiceTypeLoadBalancer {
+		if len(svc.Status.LoadBalancer.Ingress) > 0 {
+			if svc.Status.LoadBalancer.Ingress[0].Hostname != "" {
+				address = svc.Status.LoadBalancer.Ingress[0].Hostname
+			} else if svc.Status.LoadBalancer.Ingress[0].IP != "" {
+				address = svc.Status.LoadBalancer.Ingress[0].IP
+			}
+		} else {
+			address = ""
+		}
+	}
+	return address
+}
+
 func (r *IpfsReconciler) saGenerate(m *clusterv1alpha1.Ipfs) *corev1.ServiceAccount {
 	// Define a new Service Account object
 	serviceAcct := &corev1.ServiceAccount{
@@ -425,6 +450,10 @@ func (r *IpfsReconciler) iSSGenerate(m *clusterv1alpha1.Ipfs) *appsv1.StatefulSe
 								{
 									Name:  "IPFS_PROFILE",
 									Value: "flatfs",
+								},
+								{
+									Name:  "IPFS_ADDITIONAL_ANNOUNCE",
+									Value: m.Status.Address,
 								},
 							},
 							Ports: []corev1.ContainerPort{
@@ -711,6 +740,10 @@ func (r *IpfsReconciler) pubSvcGenerate(m *clusterv1alpha1.Ipfs) *corev1.Service
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "public-gateway-" + m.Name,
 			Namespace: m.Namespace,
+			Annotations: map[string]string{
+				"service.beta.kubernetes.io/aws-load-balancer-type":   "nlb",
+				"service.beta.kubernetes.io/aws-load-balancer-scheme": "internet-facing",
+			},
 			Labels: map[string]string{
 				"app.kubernetes.io/name":     "ipfs-cluster-" + m.Name,
 				"app.kubernetes.io/instance": "ipfs-cluster-" + m.Name,

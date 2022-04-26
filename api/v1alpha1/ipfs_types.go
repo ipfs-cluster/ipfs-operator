@@ -40,6 +40,7 @@ type IpfsSpec struct {
 
 type IpfsStatus struct {
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
+	Address    string             `json:"address,omitempty"`
 }
 
 //+kubebuilder:object:root=true

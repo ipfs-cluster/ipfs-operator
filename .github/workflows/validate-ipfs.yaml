@@ -133,6 +133,7 @@ jobs:
         make bundle
         kubectl create ns ipfs-operator-system
         make deploy
+        sleep 2m
 
     - name: run e2e tests
       run: make test-e2e

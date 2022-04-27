@@ -109,7 +109,7 @@ jobs:
       run: docker load -i /tmp/bundle.tar
 
     - name: Load the Container Image into Kind
-      run: kind load docker-image ${BUNDLE_IMAGE}
+      run: kind load docker-image ${BUNDLE_IMAGE}:${TAG}
 
     - name: Pull the Container Image from Artifacts
       uses: actions/download-artifact@v1
@@ -121,11 +121,11 @@ jobs:
       run: docker load -i /tmp/operator.tar
 
     - name: Load the Container Image into Kind
-      run: kind load docker-image ${OPERATOR_IMAGE}
+      run: kind load docker-image ${OPERATOR_IMAGE}:${TAG}
 
   push-operator:
     name: Push operator container to registry
-    needs: build-operator
+    needs: deploy
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
@@ -164,7 +164,7 @@ jobs:
 
   push-bundle:
     name: Push bundle container to registry
-    needs: build-bundle
+    needs: deploy
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
@@ -174,7 +174,7 @@ jobs:
       - name: Load container artifact
         uses: actions/download-artifact@v1
         with:
-          name: primer-bundle
+          name: operator-bundle
           path: /tmp
 
       - name: Import container image

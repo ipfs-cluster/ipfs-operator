@@ -1,0 +1,199 @@
+name: Validate Ipfs
+on: 
+  push:
+    branches: ["main", "release*"]
+    tags: ["*"]
+  pull_request:
+    branches: ["main", "release*"]
+
+env:
+  GO_VERSION: "1.17"
+  GO111MODULE: "on"
+  OPERATOR_IMAGE: "quay.io/redhat-et-ipfs/ipfs-operator"
+  BUNDLE_IMAGE: "quay.io/redhat-et-ipfs/ipfs-operator-bundle"
+  TAG: v0.0.1
+
+
+jobs:
+  build-operator:
+    name: Build-operator
+    runs-on: ubuntu-20.04
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v2
+
+      - name: Install Go
+        uses: actions/setup-go@v1
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Test
+        run: make test
+
+      - name: Build operator container
+        run: make docker-build IMG=${OPERATOR_IMAGE}
+
+      - name: Export container image
+        run: docker save -o /tmp/operator.tar ${OPERATOR_IMAGE}
+
+      - name: Save container as artifact
+        uses: actions/upload-artifact@v1
+        with:
+          name: ipfs-operator
+          path: /tmp/operator.tar
+
+  build-bundle:
+    name: Build-Bundle
+    runs-on: ubuntu-20.04
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v2
+
+      - name: Install Go
+        uses: actions/setup-go@v1
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      
+      - name: Install operator-sdk
+        run: |
+          curl -L -o operator-sdk https://github.com/operator-framework/operator-sdk/releases/download/v1.11.0/operator-sdk_linux_amd64
+          sudo install ./operator-sdk /usr/local/bin && rm operator-sdk
+
+      - name: Make bundle
+        run: make bundle
+
+      - name: Build bundle
+        run: make bundle-build
+
+      - name: Export container image
+        run: docker save -o /tmp/bundle.tar ${BUNDLE_IMAGE}
+
+      - name: Save container as artifact
+        uses: actions/upload-artifact@v1
+        with:
+          name: operator-bundle
+          path: /tmp/bundle.tar
+
+  deploy:
+    name: Deploy Kind cluster and run tests
+    needs: [ build-bundle, build-operator ]
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Install the Kubectl binary
+      run: |
+        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+        sudo install ./kubectl /usr/local/bin/
+        kubectl version --short --client
+    
+    - name: Install the Kind binary
+      run: |
+        curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.8.1/kind-linux-amd64
+        chmod +x ./kind
+        sudo mv ./kind /usr/local/bin/kind
+        kind version
+        
+    - name: Create a Kind Cluster
+      run: kind create cluster
+
+    - name: Pull the Container Image from Artifacts
+      uses: actions/download-artifact@v1
+      with:
+        name: operator-bundle
+        path: /tmp
+
+    - name: Load the Container Image
+      run: docker load -i /tmp/bundle.tar
+
+    - name: Load the Container Image into Kind
+      run: kind load docker-image ${BUNDLE_IMAGE}
+
+    - name: Pull the Container Image from Artifacts
+      uses: actions/download-artifact@v1
+      with:
+        name: ipfs-operator
+        path: /tmp
+
+    - name: Load the Container Image
+      run: docker load -i /tmp/operator.tar
+
+    - name: Load the Container Image into Kind
+      run: kind load docker-image ${OPERATOR_IMAGE}
+
+  push-operator:
+    name: Push operator container to registry
+    needs: build-operator
+    if: >
+      (github.event_name == 'push' || github.event_name == 'schedule') &&
+      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Load container artifact
+        uses: actions/download-artifact@v1
+        with:
+          name: ipfs-operator
+          path: /tmp
+
+      - name: Import container image
+        run: |
+          docker load -i /tmp/operator.tar
+          docker inspect ${OPERATOR_IMAGE}
+      - name: Login to registry
+        # If the registry server is specified in the image name, we use that.
+        # If the server isn't in the image name, default to docker.io
+        run: |
+          [[ "${OPERATOR_IMAGE}" =~ ^([^/]+)/[^/]+/[^/]+ ]] && REGISTRY="${BASH_REMATCH[1]}" || REGISTRY="docker.io"
+          echo "Attempting docker login to: ${REGISTRY}"
+          echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login -u "${{ secrets.REGISTRY_USERNAME }}" --password-stdin ${REGISTRY}
+      - name: Push to registry (latest)
+        if: >
+          (github.event_name == 'push' || github.event_name == 'schedule') &&
+          github.ref == 'refs/heads/main'
+        run: |
+          docker push "${OPERATOR_IMAGE}"
+      - name: Push to registry (version tag)
+        if: >
+          (github.event_name == 'push' || github.event_name == 'schedule') &&
+          github.ref == 'refs/heads/main'
+        run: |
+          docker tag "${OPERATOR_IMAGE}" "${OPERATOR_IMAGE}:${{ env.TAG }}"
+          docker push "${OPERATOR_IMAGE}:${{ env.TAG }}"
+
+  push-bundle:
+    name: Push bundle container to registry
+    needs: build-bundle
+    if: >
+      (github.event_name == 'push' || github.event_name == 'schedule') &&
+      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    runs-on: ubuntu-20.04
+
+    steps:
+      - name: Load container artifact
+        uses: actions/download-artifact@v1
+        with:
+          name: primer-bundle
+          path: /tmp
+
+      - name: Import container image
+        run: |
+          docker load -i /tmp/bundle.tar
+          docker inspect "${BUNDLE_IMAGE}:${{ env.TAG }}"
+          
+      - name: Login to registry
+        # If the registry server is specified in the image name, we use that.
+        # If the server isn't in the image name, default to docker.io
+        run: |
+          [[ "${BUNDLE_IMAGE}" =~ ^([^/]+)/[^/]+/[^/]+ ]] && REGISTRY="${BASH_REMATCH[1]}" || REGISTRY="docker.io"
+          echo "Attempting docker login to: ${REGISTRY}"
+          echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login -u "${{ secrets.REGISTRY_USERNAME }}" --password-stdin ${REGISTRY}
+          
+      - name: Push to registry (version tag)
+        if: >
+          (github.event_name == 'push' || github.event_name == 'schedule') &&
+          github.ref == 'refs/heads/main'
+        run: |
+          echo "Pushing to ${{ env.TAG }}"
+          docker push "${BUNDLE_IMAGE}:${{ env.TAG }}"

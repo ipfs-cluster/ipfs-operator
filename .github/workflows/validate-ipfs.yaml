@@ -123,6 +123,25 @@ jobs:
     - name: Load the Container Image into Kind
       run: kind load docker-image ${OPERATOR_IMAGE}:${TAG}
 
+    - name: Install operator-sdk
+      run: |
+        curl -L -o operator-sdk https://github.com/operator-framework/operator-sdk/releases/download/v1.11.0/operator-sdk_linux_amd64
+        sudo install ./operator-sdk /usr/local/bin && rm operator-sdk
+
+    - name: Install the operator
+      run: |
+        make bundle
+        operator-sdk run bundle quay.io/rcook/ipfs-operator-bundle:v0.0.1 -n ipfs-operator-system
+
+    - name: create an ipfs example
+      run: kubectl create -f config/samples/cluster_v1alpha1_ipfs.yaml
+
+    - name: wait
+      run: sleep 60
+    
+    - name: list pods
+      run: kubectl get pods
+
   push-operator:
     name: Push operator container to registry
     needs: deploy

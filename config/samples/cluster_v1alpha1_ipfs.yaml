@@ -6,4 +6,4 @@ spec:
   url: .apps.cl1.octo-emerging.redhataicoe.com
   ipfsStorage: 2Gi
   clusterStorage: 2Gi
-  public: true
+  public: false

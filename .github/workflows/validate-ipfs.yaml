@@ -135,7 +135,7 @@ jobs:
         make deploy
 
     - name: run e2e tests
-      run: test-e2e
+      run: make test-e2e
 
   push-operator:
     name: Push operator container to registry

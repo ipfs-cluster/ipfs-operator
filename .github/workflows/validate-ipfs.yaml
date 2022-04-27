@@ -127,14 +127,12 @@ jobs:
       run: |
         curl -L -o operator-sdk https://github.com/operator-framework/operator-sdk/releases/download/v1.11.0/operator-sdk_linux_amd64
         sudo install ./operator-sdk /usr/local/bin && rm operator-sdk
-        operator-sdk olm install
-
 
     - name: Install the operator
       run: |
         make bundle
         kubectl create ns ipfs-operator-system
-        operator-sdk run bundle quay.io/rcook/ipfs-operator-bundle:v0.0.1 -n ipfs-operator-system
+        make deploy
 
     - name: create an ipfs example
       run: kubectl create -f config/samples/cluster_v1alpha1_ipfs.yaml

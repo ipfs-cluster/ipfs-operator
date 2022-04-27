@@ -131,16 +131,17 @@ jobs:
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     runs-on: ubuntu-20.04
     steps:
-      - name: Load container artifact
+      - name: Pull the Container Image from Artifacts
         uses: actions/download-artifact@v1
         with:
           name: ipfs-operator
           path: /tmp
 
-      - name: Import container image
+      - name: Load the Container Image
         run: |
           docker load -i /tmp/operator.tar
-          docker inspect ${OPERATOR_IMAGE}
+          docker inspect ${OPERATOR_IMAGE}:${TAG}
+
       - name: Login to registry
         # If the registry server is specified in the image name, we use that.
         # If the server isn't in the image name, default to docker.io

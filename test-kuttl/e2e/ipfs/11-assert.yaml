@@ -1,0 +1,11 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: ipfs-ipfs-sample-1
+  namespace: default
+status:
+  currentReplicas: 1

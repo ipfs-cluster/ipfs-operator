@@ -1,0 +1,13 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+timeout: 200
+---
+apiVersion: apps/v1
+kind: Deployment 
+metadata:
+  name: ipfs-operator-controller-manager
+  namespace: ipfs-operator-system
+status:
+  availableReplicas: 1
+  readyReplicas: 1

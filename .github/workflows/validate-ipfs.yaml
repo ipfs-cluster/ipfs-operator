@@ -134,17 +134,8 @@ jobs:
         kubectl create ns ipfs-operator-system
         make deploy
 
-    - name: wait
-      run: sleep 60
-
-    - name: create an ipfs example
-      run: kubectl create -f config/samples/cluster_v1alpha1_ipfs.yaml 
-
-    - name: get the ipfs operator pod
-      run: kubectl get pods -n ipfs-operator-system
-
-    - name: ensure cluster pods are running in defalt namespace
-      run: kubectl get pods -n default -o wide
+    - name: run e2e tests
+      run: test-e2e
 
   push-operator:
     name: Push operator container to registry

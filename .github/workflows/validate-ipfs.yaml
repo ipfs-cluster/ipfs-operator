@@ -149,19 +149,12 @@ jobs:
           [[ "${OPERATOR_IMAGE}" =~ ^([^/]+)/[^/]+/[^/]+ ]] && REGISTRY="${BASH_REMATCH[1]}" || REGISTRY="docker.io"
           echo "Attempting docker login to: ${REGISTRY}"
           echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login -u "${{ secrets.REGISTRY_USERNAME }}" --password-stdin ${REGISTRY}
-      - name: Push to registry (latest)
-        if: >
-          (github.event_name == 'push' || github.event_name == 'schedule') &&
-          github.ref == 'refs/heads/main'
-        run: |
-          docker push "${OPERATOR_IMAGE}"
       - name: Push to registry (version tag)
         if: >
           (github.event_name == 'push' || github.event_name == 'schedule') &&
           github.ref == 'refs/heads/main'
         run: |
-          docker tag "${OPERATOR_IMAGE}" "${OPERATOR_IMAGE}:${{ env.TAG }}"
-          docker push "${OPERATOR_IMAGE}:${{ env.TAG }}"
+          docker push "${OPERATOR_IMAGE}:${TAG}"
 
   push-bundle:
     name: Push bundle container to registry

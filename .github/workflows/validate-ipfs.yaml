@@ -32,10 +32,10 @@ jobs:
         run: make test
 
       - name: Build operator container
-        run: make docker-build IMG=${OPERATOR_IMAGE}
+        run: make docker-build IMG=${OPERATOR_IMAGE}:${TAG}
 
       - name: Export container image
-        run: docker save -o /tmp/operator.tar ${OPERATOR_IMAGE}
+        run: docker save -o /tmp/operator.tar ${OPERATOR_IMAGE}:${TAG}
 
       - name: Save container as artifact
         uses: actions/upload-artifact@v1

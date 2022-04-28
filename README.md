@@ -28,4 +28,7 @@ spec:
   clusterStorage: 2Gi
   public: true
 ```
-
+Once the values match your environment run the following.
+```
+kubectl create -n default -f ifps.yaml
+```

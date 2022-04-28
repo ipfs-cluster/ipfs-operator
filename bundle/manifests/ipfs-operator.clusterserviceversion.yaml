@@ -13,8 +13,8 @@ metadata:
           "spec": {
             "clusterStorage": "2Gi",
             "ipfsStorage": "2Gi",
-            "public": false,
-            "url": "apps.cl1.octo-emerging.redhataicoe.com"
+            "public": true,
+            "url": "apps.jephilli-4-11-04-28-0655.devcluster.openshift.com"
           }
         }
       ]

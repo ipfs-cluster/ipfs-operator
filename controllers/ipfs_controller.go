@@ -43,7 +43,7 @@ const (
 	finalizer = "openshift.ifps.cluster"
 )
 
-// IpfsReconciler reconciles a Export object
+// IpfsReconciler reconciles a Ipfs object
 type IpfsReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
@@ -59,30 +59,20 @@ type IpfsReconciler struct {
 //+kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=*,resources=*,verbs=get;list
 
-// Reconcile is part of the main kubernetes reconciliation loop which aims to
-// move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the Export object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
-//
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.8.3/pkg/reconcile
-
 func (r *IpfsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
-	// Fetch the Export instance
+	// Fetch the Ipfs instance
 	instance := &clusterv1alpha1.Ipfs{}
 	if err := r.Get(ctx, req.NamespacedName, instance); err != nil {
 		if errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
 			// Return and don't requeue
-			log.Info("Export resource not found. Ignoring since object must be deleted")
+			log.Info("Ipfs resource not found. Ignoring since object must be deleted")
 			return ctrl.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
-		log.Error(err, "Failed to get Export")
+		log.Error(err, "Failed to get Ipfs")
 		return ctrl.Result{}, err
 	}
 
@@ -141,6 +131,7 @@ func (r *IpfsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 			}
 			log.Error(err, "Failed to get StatefulSet")
 		}
+		return ctrl.Result{Requeue: true}, nil
 	}
 
 	// Check if statefulset already exists, if not create a new one

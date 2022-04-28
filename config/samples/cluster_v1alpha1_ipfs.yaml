@@ -3,7 +3,7 @@ kind: Ipfs
 metadata:
   name: ipfs-sample-1
 spec:
-  url: apps.jephilli-4-11-04-28-0655.devcluster.openshift.com 
-  ipfsStorage: 2Gi
-  clusterStorage: 2Gi
+  url: apps.ci-ln-fy6ygqt-72292.origin-ci-int-gce.dev.rhcloud.com
+  ipfsStorage: 32Gi
+  clusterStorage: 42Gi
   public: true

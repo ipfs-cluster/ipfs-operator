@@ -317,7 +317,7 @@ jobs:
           docker push "${GO_IPFS_IMAGE}:${{ env.GO_IPFS_VERSION }}"
 
   push-cluster:
-    name: Push ipfs container to registry
+    name: Push cluster image to registry
     needs: deploy
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
@@ -328,12 +328,12 @@ jobs:
       - name: Load container artifact
         uses: actions/download-artifact@v1
         with:
-          name: go-ipfs
+          name: cluster
           path: /tmp
 
       - name: Import container image
         run: |
-          docker load -i /tmp/go-ipfs.tar
+          docker load -i /tmp/cluster.tar
           docker inspect "${CLUSTER_IMAGE}:${{ env.CLUSTER_VERSION }}"
           
       - name: Login to registry

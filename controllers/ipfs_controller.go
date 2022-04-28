@@ -630,7 +630,7 @@ func (r *IpfsReconciler) ingressGenerate(m *clusterv1alpha1.Ipfs) *networkingv1.
 		Spec: networkingv1.IngressSpec{
 			Rules: []networkingv1.IngressRule{
 				{
-					Host: "cluster-" + m.Namespace + m.Spec.URL + ".",
+					Host: "cluster-" + m.Namespace + "." + m.Spec.URL,
 					IngressRuleValue: networkingv1.IngressRuleValue{
 						HTTP: &networkingv1.HTTPIngressRuleValue{
 							Paths: []networkingv1.HTTPIngressPath{

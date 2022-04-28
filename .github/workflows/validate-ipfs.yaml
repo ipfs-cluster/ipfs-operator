@@ -91,7 +91,7 @@ jobs:
     
     - name: Install the Kind binary
       run: |
-        curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.8.1/kind-linux-amd64
+        curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.12.0/kind-linux-amd64
         chmod +x ./kind
         sudo mv ./kind /usr/local/bin/kind
         kind version
@@ -133,8 +133,8 @@ jobs:
         make bundle
         kubectl create ns ipfs-operator-system
         make deploy
-        sleep 8m
         kubectl get events -n ipfs-operator-system
+        kube get po -A
 
     - name: run e2e tests
       run: make test-e2e

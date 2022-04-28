@@ -134,7 +134,7 @@ jobs:
         kubectl create ns ipfs-operator-system
         make deploy
         kubectl get events -n ipfs-operator-system
-        kube get po -A
+        kubectl get po -A
 
     - name: run e2e tests
       run: make test-e2e

@@ -298,7 +298,7 @@ jobs:
       - name: Import container image
         run: |
           docker load -i /tmp/go-ipfs.tar
-          docker inspect "${GO_IPFS_IMAGE}:${{ env.GO_IPFS_VERSION }}"
+          docker inspect ${GO_IPFS_IMAGE}:${GO_IPFS_VERSION}
           
       - name: Login to registry
         # If the registry server is specified in the image name, we use that.

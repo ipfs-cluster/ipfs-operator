@@ -14,7 +14,7 @@ metadata:
             "clusterStorage": "2Gi",
             "ipfsStorage": "2Gi",
             "public": false,
-            "url": ".apps.cl1.octo-emerging.redhataicoe.com"
+            "url": "apps.cl1.octo-emerging.redhataicoe.com"
           }
         }
       ]

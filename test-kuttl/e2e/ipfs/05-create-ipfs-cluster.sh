@@ -8,7 +8,7 @@ kind: Ipfs
 metadata:
   name: ipfs-sample-1
 spec:
-  url: .example.com
+  url: example.com
   ipfsStorage: 2Gi
   clusterStorage: 2Gi
   public: false

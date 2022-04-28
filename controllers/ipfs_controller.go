@@ -439,7 +439,7 @@ func (r *IpfsReconciler) iSSGenerate(m *clusterv1alpha1.Ipfs) *appsv1.StatefulSe
 					Containers: []corev1.Container{
 						{
 							Name:            "ipfs",
-							Image:           "quay.io/rcook/ipfs-mirror:go-ipfs",
+							Image:           "quay.io/redhat-et-ipfs/ipfs:v0.12.2",
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							Env: []corev1.EnvVar{
 								{
@@ -566,7 +566,7 @@ func (r *IpfsReconciler) cSSGenerate(m *clusterv1alpha1.Ipfs) *appsv1.StatefulSe
 									Value: "2s",
 								},
 							},
-							Image:           "quay.io/rcook/ipfs-mirror:cluster",
+							Image:           "quay.io/redhat-et-ipfs/cluster:v1.0.0",
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							Ports: []corev1.ContainerPort{
 								{

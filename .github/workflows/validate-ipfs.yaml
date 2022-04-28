@@ -12,9 +12,7 @@ env:
   OPERATOR_IMAGE: "quay.io/redhat-et-ipfs/ipfs-operator"
   BUNDLE_IMAGE: "quay.io/redhat-et-ipfs/ipfs-operator-bundle"
   TAG: v0.0.1
-  GO_IPFS_IMAGE: "quay.io/redhat-et-ipfs/ipfs"
   CLUSTER_IMAGE: "quay.io/redhat-et-ipfs/cluster"
-  GO_IPFS_VERSION: v0.12.2
   CLUSTER_VERSION: v1.0.0
 
 
@@ -80,28 +78,6 @@ jobs:
           name: operator-bundle
           path: /tmp/bundle.tar
 
-  go-ipfs:
-    name: build go-ipfs image
-    runs-on: ubuntu-20.04
-    steps:
-    - uses: actions/checkout@v2
-      with:
-        repository: cooktheryan/go-ipfs
-        ref: ${{ env.GO_IPFS_VERSION }}
-
-    - name: podman build
-      run: |
-        podman build -t ${{ env.GO_IPFS_IMAGE }}:${{ env.GO_IPFS_VERSION }} .
-
-    - name: save the image
-      run: podman save -o /tmp/go-ipfs.tar ${{ env.GO_IPFS_IMAGE }}:${{ env.GO_IPFS_VERSION }}
-
-    - name: archive the image
-      uses: actions/upload-artifact@v1
-      with:
-        name: go-ipfs
-        path: /tmp/go-ipfs.tar
-
   cluster:
     name: build cluster image
     runs-on: ubuntu-20.04
@@ -126,7 +102,7 @@ jobs:
 
   deploy:
     name: Deploy Kind cluster and run tests
-    needs: [ build-bundle, build-operator, go-ipfs, cluster ]
+    needs: [ build-bundle, build-operator, cluster ]
     runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v2
@@ -182,18 +158,6 @@ jobs:
 
     - name: Load the Container Image into Kind
       run: kind load docker-image ${CLUSTER_IMAGE}:${CLUSTER_VERSION}
-
-    - name: Pull the Container Image from Artifacts
-      uses: actions/download-artifact@v1
-      with:
-        name: go-ipfs
-        path: /tmp
-
-    - name: Load the Container Image
-      run: docker load -i /tmp/go-ipfs.tar
-
-    - name: Load the Container Image into Kind
-      run: kind load docker-image ${GO_IPFS_IMAGE}:${GO_IPFS_VERSION}
 
     - name: Install operator-sdk
       run: |
@@ -279,42 +243,6 @@ jobs:
         run: |
           echo "Pushing to ${{ env.TAG }}"
           docker push "${BUNDLE_IMAGE}:${{ env.TAG }}"
-
-  push-ipfs:
-    name: Push ipfs container to registry
-    needs: deploy
-    if: >
-      (github.event_name == 'push' || github.event_name == 'schedule') &&
-      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
-    runs-on: ubuntu-20.04
-
-    steps:
-      - name: Load container artifact
-        uses: actions/download-artifact@v1
-        with:
-          name: go-ipfs
-          path: /tmp
-
-      - name: Import container image
-        run: |
-          docker load -i /tmp/go-ipfs.tar
-          docker inspect ${GO_IPFS_IMAGE}:${GO_IPFS_VERSION}
-          
-      - name: Login to registry
-        # If the registry server is specified in the image name, we use that.
-        # If the server isn't in the image name, default to docker.io
-        run: |
-          [[ "${BUNDLE_IMAGE}" =~ ^([^/]+)/[^/]+/[^/]+ ]] && REGISTRY="${BASH_REMATCH[1]}" || REGISTRY="docker.io"
-          echo "Attempting docker login to: ${REGISTRY}"
-          echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login -u "${{ secrets.REGISTRY_USERNAME }}" --password-stdin ${REGISTRY}
-          
-      - name: Push to registry (version tag)
-        if: >
-          (github.event_name == 'push' || github.event_name == 'schedule') &&
-          github.ref == 'refs/heads/main'
-        run: |
-          echo "Pushing to ${GO_IPFS_IMAGE}:${{ env.GO_IPFS_VERSION }}"
-          docker push "${GO_IPFS_IMAGE}:${{ env.GO_IPFS_VERSION }}"
 
   push-cluster:
     name: Push cluster image to registry

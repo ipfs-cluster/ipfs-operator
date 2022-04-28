@@ -11,10 +11,10 @@ metadata:
             "name": "ipfs-sample-1"
           },
           "spec": {
-            "clusterStorage": "2Gi",
-            "ipfsStorage": "2Gi",
+            "clusterStorage": "42Gi",
+            "ipfsStorage": "32Gi",
             "public": true,
-            "url": "apps.jephilli-4-11-04-28-0655.devcluster.openshift.com"
+            "url": "apps.ci-ln-fy6ygqt-72292.origin-ci-int-gce.dev.rhcloud.com"
           }
         }
       ]

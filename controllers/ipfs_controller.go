@@ -18,7 +18,6 @@ package controllers
 
 import (
 	"context"
-	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -27,8 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -101,228 +98,146 @@ func (r *IpfsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		return ctrl.Result{}, nil
 	}
 
-	// Check if statefulset already exists, if not create a new one
-	if instance.Spec.Public && instance.Status.Address != "" || !instance.Spec.Public {
-		foundiSS := &appsv1.StatefulSet{}
-		if err := r.Get(ctx, types.NamespacedName{Name: "ipfs-" + instance.Name, Namespace: instance.Namespace}, foundiSS); err != nil {
+	var requeue bool
+
+	{
+		// create or update pubsvc,
+		// requeue if we don't yet know the address.
+		if instance.Spec.Public {
+			pubsvc := r.pubSvcGenerate(instance)
+			foundPubsvc := new(corev1.Service)
+			key := client.ObjectKeyFromObject(pubsvc)
+			log.Info("key name", "name", key.Name)
+			log.Info("key namespace", "namespace", key.Namespace)
+			if err := r.Get(ctx, client.ObjectKeyFromObject(pubsvc), foundPubsvc); err != nil {
+				if errors.IsNotFound(err) {
+					if err := r.Create(ctx, pubsvc); err != nil {
+						log.Info("error creating pubsvc", "err", err)
+						requeue = true
+					}
+				} else {
+					requeue = true
+				}
+			} else {
+				r.Update(ctx, pubsvc)
+			}
+			if instance.Status.Address == "" {
+				requeue = true
+			}
+		}
+	}
+
+	{
+		// create or update iss
+		iss := r.iSSGenerate(instance)
+		foundIss := new(appsv1.StatefulSet)
+		if err := r.Get(ctx, client.ObjectKeyFromObject(iss), foundIss); err != nil {
 			if errors.IsNotFound(err) {
-				// Define a new statefulset
-				statefulSet := r.iSSGenerate(instance)
-				log.Info("Creating a new StatefulSet", "StatefulSet.Namespace", statefulSet.Namespace, "StatefulSet.Name", statefulSet.Name)
-				if err := r.Create(ctx, statefulSet); err != nil {
-					log.Error(err, "Failed to create new StatefulSet", "statefulSet.Namespace", statefulSet.Namespace, "statefulSet.Name", statefulSet.Name)
-
-					return ctrl.Result{}, err
+				if err := r.Create(ctx, iss); err != nil {
+					log.Info("error creating ipfs statefulset", "err", err)
+					requeue = true
 				}
-				if err := wait.Poll(time.Second*1, time.Second*15, func() (done bool, err error) {
-					if err := r.Get(ctx, types.NamespacedName{Name: "ipfs-" + instance.Name, Namespace: instance.Namespace}, foundiSS); err != nil {
-						if errors.IsNotFound(err) {
-							return false, nil
-						} else {
-							return false, err
-						}
-					}
-					return true, nil
-				}); err != nil {
-					return ctrl.Result{}, err
-				}
-				// StatefulSet created successfully - return and requeue
-				return ctrl.Result{Requeue: true}, nil
+			} else {
+				requeue = true
 			}
-			log.Error(err, "Failed to get StatefulSet")
+		} else {
+			r.Update(ctx, iss)
 		}
-		return ctrl.Result{Requeue: true}, nil
 	}
 
-	// Check if statefulset already exists, if not create a new one
-	foundcSS := &appsv1.StatefulSet{}
-	if err := r.Get(ctx, types.NamespacedName{Name: "cluster-" + instance.Name, Namespace: instance.Namespace}, foundcSS); err != nil {
-		if errors.IsNotFound(err) {
-			// Define a new statefulset
-			statefulSet := r.cSSGenerate(instance)
-			log.Info("Creating a new StatefulSet", "StatefulSet.Namespace", statefulSet.Namespace, "StatefulSet.Name", statefulSet.Name)
-			if err := r.Create(ctx, statefulSet); err != nil {
-				log.Error(err, "Failed to create new StatefulSet", "statefulSet.Namespace", statefulSet.Namespace, "statefulSet.Name", statefulSet.Name)
-
-				return ctrl.Result{}, err
-			}
-			if err := wait.Poll(time.Second*1, time.Second*15, func() (done bool, err error) {
-				if err := r.Get(ctx, types.NamespacedName{Name: "cluster-" + instance.Name, Namespace: instance.Namespace}, foundcSS); err != nil {
-					if errors.IsNotFound(err) {
-						return false, nil
-					} else {
-						return false, err
-					}
-				}
-				return true, nil
-			}); err != nil {
-				return ctrl.Result{}, err
-			}
-			// StatefulSet created successfully - return and requeue
-			return ctrl.Result{Requeue: true}, nil
-		}
-		log.Error(err, "Failed to get StatefulSet")
-	}
-
-	// Check if the Service Account already exists, if not create a new one
-	foundSA := &corev1.ServiceAccount{}
-	if err := r.Get(ctx, types.NamespacedName{Name: "ipfs-cluster-" + instance.Name, Namespace: instance.Namespace}, foundSA); err != nil {
-		if errors.IsNotFound(err) {
-			// Define a new Service Account
-			serviceAcct := r.saGenerate(instance)
-			log.Info("Creating a new Service Account", "serviceAcct.Namespace", serviceAcct.Namespace, "serviceAcct.Name", serviceAcct.Name)
-			if err := r.Create(ctx, serviceAcct); err != nil {
-				log.Error(err, "Failed to create new Service Account", "serviceAcct.Namespace", serviceAcct.Namespace, "serviceAcct.Name", serviceAcct.Name)
-
-				return ctrl.Result{}, err
-			}
-			if err := wait.Poll(time.Second*1, time.Second*15, func() (done bool, err error) {
-				if err := r.Get(ctx, types.NamespacedName{Name: "ipfs-cluster-" + instance.Name, Namespace: instance.Namespace}, foundSA); err != nil {
-					if errors.IsNotFound(err) {
-						return false, nil
-					} else {
-						return false, err
-					}
-				}
-				return true, nil
-			}); err != nil {
-				return ctrl.Result{}, err
-			}
-			// Service Account created successfully - return and requeue
-			return ctrl.Result{Requeue: true}, nil
-		}
-		log.Error(err, "Failed to get Service Account")
-	}
-
-	// Check if the service already exists, if not create a new one
-	foundService := &corev1.Service{}
-	if err := r.Get(ctx, types.NamespacedName{Name: "cluster-" + instance.Name, Namespace: instance.Namespace}, foundService); err != nil {
-		if errors.IsNotFound(err) {
-			// Define a new service
-			service := r.csvcGenerate(instance)
-			log.Info("Creating a new Service", "service.Namespace", service.Namespace, "service.Name", service.Name)
-			if err := r.Create(ctx, service); err != nil {
-				log.Error(err, "Failed to create a Service", "service.Namespace", service.Namespace, "service.Name", service.Name)
-
-				return ctrl.Result{}, err
-			}
-			if err := wait.Poll(time.Second*1, time.Second*15, func() (done bool, err error) {
-				if err := r.Get(ctx, types.NamespacedName{Name: "cluster-" + instance.Name, Namespace: instance.Namespace}, foundService); err != nil {
-					if errors.IsNotFound(err) {
-						return false, nil
-					} else {
-						return false, err
-					}
-				}
-				return true, nil
-			}); err != nil {
-				return ctrl.Result{}, err
-			}
-			// Service created successfully - return and requeue
-			return ctrl.Result{Requeue: true}, nil
-		}
-		log.Error(err, "Failed to get Service")
-	}
-
-	// Check if the service already exists, if not create a new one
-	if instance.Spec.Public {
-		foundPublicService := &corev1.Service{}
-		if err := r.Get(ctx, types.NamespacedName{Name: "public-gateway-" + instance.Name, Namespace: instance.Namespace}, foundPublicService); err != nil {
+	{
+		// create or update css
+		css := r.cSSGenerate(instance)
+		foundCss := new(appsv1.StatefulSet)
+		if err := r.Get(ctx, client.ObjectKeyFromObject(css), foundCss); err != nil {
 			if errors.IsNotFound(err) {
-				// Define a new service
-				service := r.pubSvcGenerate(instance)
-				log.Info("Creating a new Service", "service.Namespace", service.Namespace, "service.Name", service.Name)
-				if err := r.Create(ctx, service); err != nil {
-					log.Error(err, "Failed to create a Service", "service.Namespace", service.Namespace, "service.Name", service.Name)
-
-					return ctrl.Result{}, err
+				if err := r.Create(ctx, css); err != nil {
+					log.Info("error creating cluster statefulset", "err", err)
+					requeue = true
 				}
-				if err := wait.Poll(time.Second*1, time.Second*15, func() (done bool, err error) {
-					if err := r.Get(ctx, types.NamespacedName{Name: "public-gateway-" + instance.Name, Namespace: instance.Namespace}, foundPublicService); err != nil {
-						if errors.IsNotFound(err) {
-							return false, nil
-						} else {
-							return false, err
-						}
-					}
-					return true, nil
-				}); err != nil {
-					return ctrl.Result{}, err
-				}
-				// Service created successfully - return and requeue
-				return ctrl.Result{Requeue: true}, nil
+			} else {
+				requeue = true
 			}
-			log.Error(err, "Failed to get Service")
-		}
-		if instance.Status.Address == "" {
-			instance.Status.Address = getServiceAddress(foundPublicService)
-			if err := r.Status().Update(ctx, instance); err != nil {
-				log.Error(err, "LB may not be ready yet, requeuing")
-				return ctrl.Result{Requeue: true}, nil
-			}
+		} else {
+			r.Update(ctx, css)
 		}
 	}
 
-	// Check for ingress
-	foundIngress := &networkingv1.Ingress{}
-	if err := r.Get(ctx, types.NamespacedName{Name: "ipfs-" + instance.Name, Namespace: instance.Namespace}, foundIngress); err != nil {
-		if errors.IsNotFound(err) {
-			// Define a new service
-			ingress := r.ingressGenerate(instance)
-			log.Info("Creating a new Ingress", "ingress.Namespace", ingress.Namespace, "ingress.Name", ingress.Name)
-			if err := r.Create(ctx, ingress); err != nil {
-				log.Error(err, "Failed to create a Ingress", "ingress.Namespace", ingress.Namespace, "ingress.Name", ingress.Name)
-
-				return ctrl.Result{}, err
-			}
-			if err := wait.Poll(time.Second*1, time.Second*15, func() (done bool, err error) {
-				if err := r.Get(ctx, types.NamespacedName{Name: "ipfs-" + instance.Name, Namespace: instance.Namespace}, foundIngress); err != nil {
-					if errors.IsNotFound(err) {
-						return false, nil
-					} else {
-						return false, err
-					}
+	{
+		// create or update service account
+		sa := r.saGenerate(instance)
+		foundSa := new(corev1.ServiceAccount)
+		if err := r.Get(ctx, client.ObjectKeyFromObject(sa), foundSa); err != nil {
+			if errors.IsNotFound(err) {
+				if err := r.Create(ctx, sa); err != nil {
+					log.Info("error creating service account", "err", err)
+					requeue = true
 				}
-				return true, nil
-			}); err != nil {
-				return ctrl.Result{}, err
+			} else {
+				requeue = true
 			}
-			// Service created successfully - return and requeue
-			return ctrl.Result{Requeue: true}, nil
+		} else {
+			r.Update(ctx, sa)
 		}
-		log.Error(err, "Failed to get Ingress")
 	}
 
-	// Check if the service already exists, if not create a new one
-	foundipfsService := &corev1.Service{}
-	if err := r.Get(ctx, types.NamespacedName{Name: "ipfs-cluster-" + instance.Name, Namespace: instance.Namespace}, foundipfsService); err != nil {
-		if errors.IsNotFound(err) {
-			// Define a new service
-			service := r.isvcGenerate(instance)
-			log.Info("Creating a new Service", "service.Namespace", service.Namespace, "service.Name", service.Name)
-			if err := r.Create(ctx, service); err != nil {
-				log.Error(err, "Failed to create a Service", "service.Namespace", service.Namespace, "service.Name", service.Name)
-
-				return ctrl.Result{}, err
-			}
-			if err := wait.Poll(time.Second*1, time.Second*15, func() (done bool, err error) {
-				if err := r.Get(ctx, types.NamespacedName{Name: "ipfs-cluster-" + instance.Name, Namespace: instance.Namespace}, foundService); err != nil {
-					if errors.IsNotFound(err) {
-						return false, nil
-					} else {
-						return false, err
-					}
+	{
+		// create or update cluster service
+		csvc := r.csvcGenerate(instance)
+		foundCsvc := new(corev1.ServiceAccount)
+		if err := r.Get(ctx, client.ObjectKeyFromObject(csvc), foundCsvc); err != nil {
+			if errors.IsNotFound(err) {
+				if err := r.Create(ctx, csvc); err != nil {
+					log.Info("error creating cluster service", "err", err)
+					requeue = true
 				}
-				return true, nil
-			}); err != nil {
-				return ctrl.Result{}, err
+			} else {
+				requeue = true
 			}
-			// Service created successfully - return and requeue
-			return ctrl.Result{Requeue: true}, nil
+		} else {
+			r.Update(ctx, csvc)
 		}
-		log.Error(err, "Failed to get Service")
 	}
-	return ctrl.Result{}, nil
+
+	{
+		// create or update IPFS service
+		isvc := r.isvcGenerate(instance)
+		foundIsvc := new(corev1.ServiceAccount)
+		if err := r.Get(ctx, client.ObjectKeyFromObject(isvc), foundIsvc); err != nil {
+			if errors.IsNotFound(err) {
+				if err := r.Create(ctx, isvc); err != nil {
+					log.Info("error creating IPFS service", "err", err)
+					requeue = true
+				}
+			} else {
+				requeue = true
+			}
+		} else {
+			r.Update(ctx, isvc)
+		}
+	}
+
+	{
+		// create or update ingress
+		ingress := r.ingressGenerate(instance)
+		foundIngress := new(networkingv1.Ingress)
+		if err := r.Get(ctx, client.ObjectKeyFromObject(ingress), foundIngress); err != nil {
+			if errors.IsNotFound(err) {
+				if err := r.Create(ctx, ingress); err != nil {
+					log.Info("error creating ingress", "err", err)
+					requeue = true
+				}
+			} else {
+				requeue = true
+			}
+		} else {
+			r.Update(ctx, ingress)
+		}
+	}
+
+	return ctrl.Result{
+		Requeue: requeue,
+	}, nil
 }
 
 func (r *IpfsReconciler) CleanUpOpjects(ctx context.Context, instance *clusterv1alpha1.Ipfs) error {
@@ -542,7 +457,7 @@ func (r *IpfsReconciler) cSSGenerate(m *clusterv1alpha1.Ipfs) *appsv1.StatefulSe
 								},
 								{
 									Name:  "CLUSTER_IPFSHTTP_NODEMULTIADDRESS",
-									Value: "/dns4/ipfs-cluster-" + m.Name + "." + m.Namespace + ".svc.cluster.local/tcp/5001",
+									Value: "/dns4/ipfs-" + m.Name + "." + m.Namespace + ".svc.cluster.local/tcp/5001",
 								},
 								{
 									Name:  "CLUSTER_CRDT_TRUSTEDPEERS",
@@ -610,7 +525,7 @@ func (r *IpfsReconciler) ingressGenerate(m *clusterv1alpha1.Ipfs) *networkingv1.
 	PathTypeImplementationSpecific := networkingv1.PathType("ImplementationSpecific")
 	ingress := &networkingv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "ipfs-" + m.Name,
+			Name:      "ipfs-cluster-" + m.Name,
 			Namespace: m.Namespace,
 			Labels: map[string]string{
 				"app.kubernetes.io/name":     "ipfs-cluster-" + m.Name,
@@ -621,7 +536,7 @@ func (r *IpfsReconciler) ingressGenerate(m *clusterv1alpha1.Ipfs) *networkingv1.
 		Spec: networkingv1.IngressSpec{
 			Rules: []networkingv1.IngressRule{
 				{
-					Host: "cluster-" + m.Namespace + "." + m.Spec.URL,
+					Host: "ipfs-cluster-" + m.Namespace + "." + m.Spec.URL,
 					IngressRuleValue: networkingv1.IngressRuleValue{
 						HTTP: &networkingv1.HTTPIngressRuleValue{
 							Paths: []networkingv1.HTTPIngressPath{
@@ -654,7 +569,7 @@ func (r *IpfsReconciler) csvcGenerate(m *clusterv1alpha1.Ipfs) *corev1.Service {
 	// Define a new service and generate secret
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "cluster-" + m.Name,
+			Name:      "ipfs-cluster-" + m.Name,
 			Namespace: m.Namespace,
 			Labels: map[string]string{
 				"app.kubernetes.io/name":     "ipfs-cluster-" + m.Name,
@@ -685,7 +600,7 @@ func (r *IpfsReconciler) isvcGenerate(m *clusterv1alpha1.Ipfs) *corev1.Service {
 	// Define a new service and generate secret
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "ipfs-cluster-" + m.Name,
+			Name:      "ipfs-" + m.Name,
 			Namespace: m.Namespace,
 			Labels: map[string]string{
 				"app.kubernetes.io/name":     "ipfs-cluster-" + m.Name,
@@ -765,6 +680,5 @@ func (r *IpfsReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.ServiceAccount{}, builder.OnlyMetadata).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: 5,
-		}).
-		Complete(r)
+		}).Complete(r)
 }

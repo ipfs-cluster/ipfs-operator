@@ -19,7 +19,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    operators.operatorframework.io/builder: operator-sdk-v1.18.0+git
+    operators.operatorframework.io/builder: operator-sdk-v1.19.0+git
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
   name: ipfs-operator.v0.0.1
   namespace: placeholder
@@ -148,7 +148,9 @@ spec:
           - create
         serviceAccountName: ipfs-operator-controller-manager
       deployments:
-      - name: ipfs-operator-controller-manager
+      - label:
+          control-plane: controller-manager
+        name: ipfs-operator-controller-manager
         spec:
           replicas: 1
           selector:
@@ -187,7 +189,7 @@ spec:
                 - --leader-elect
                 command:
                 - /manager
-                image: quay.io/redhat-et-ipfs/ipfs-operator:v0.0.1
+                image: coryschwartz/ipfs-operator:v0.0.1
                 imagePullPolicy: IfNotPresent
                 livenessProbe:
                   httpGet:

@@ -151,10 +151,6 @@ func (r *IpfsReconciler) statefulSet(m *clusterv1alpha1.Ipfs,
 										},
 									},
 								},
-								{
-									Name:  "IPFS_PROFILE",
-									Value: "flatfs",
-								},
 							},
 							Ports: []corev1.ContainerPort{
 								{

@@ -18,12 +18,14 @@ package controllers
 
 import (
 	"context"
+	crand "crypto/rand"
+	"encoding/binary"
+	"encoding/hex"
+	mrand "math/rand"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -34,7 +36,21 @@ import (
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
 	clusterv1alpha1 "github.com/redhat-et/ipfs-operator/api/v1alpha1"
+
+	ci "github.com/libp2p/go-libp2p-crypto"
+	peer "github.com/libp2p/go-libp2p-peer"
 )
+
+func init() {
+	seed := make([]byte, 8)
+	_, err := crand.Read(seed)
+	if err != nil {
+		panic(err)
+	}
+
+	useed, _ := binary.Uvarint(seed)
+	mrand.Seed(int64(useed))
+}
 
 const (
 	finalizer = "openshift.ifps.cluster"
@@ -46,15 +62,17 @@ type IpfsReconciler struct {
 	Scheme *runtime.Scheme
 }
 
+//+kubebuilder:rbac:groups=*,resources=*,verbs=get;list
+//+kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=cluster.ipfs.io,resources=ipfs,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=cluster.ipfs.io,resources=ipfs/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=cluster.ipfs.io,resources=ipfs/finalizers,verbs=update
+//+kubebuilder:rbac:groups=cluster.ipfs.io,resources=ipfs/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=*,resources=*,verbs=get;list
 
 func (r *IpfsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
@@ -100,140 +118,42 @@ func (r *IpfsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 
 	var requeue bool
 
-	{
-		// create or update pubsvc,
-		// requeue if we don't yet know the address.
-		if instance.Spec.Public {
-			pubsvc := r.pubSvcGenerate(instance)
-			foundPubsvc := new(corev1.Service)
-			key := client.ObjectKeyFromObject(pubsvc)
-			log.Info("key name", "name", key.Name)
-			log.Info("key namespace", "namespace", key.Namespace)
-			if err := r.Get(ctx, client.ObjectKeyFromObject(pubsvc), foundPubsvc); err != nil {
-				if errors.IsNotFound(err) {
-					if err := r.Create(ctx, pubsvc); err != nil {
-						log.Info("error creating pubsvc", "err", err)
-						requeue = true
-					}
-				} else {
-					requeue = true
-				}
-			} else {
-				r.Update(ctx, pubsvc)
-			}
-			if instance.Status.Address == "" {
-				requeue = true
-			}
-		}
+	priv, peerid, err := newKey()
+	if err != nil {
+		log.Error(err, "cannot generate new key")
+		return ctrl.Result{}, nil
+	}
+	privBytes, err := priv.Bytes()
+	if err != nil {
+		log.Error(err, "cannot get bytes from private key")
+		return ctrl.Result{}, nil
 	}
 
-	{
-		// create or update iss
-		iss := r.iSSGenerate(instance)
-		foundIss := new(appsv1.StatefulSet)
-		if err := r.Get(ctx, client.ObjectKeyFromObject(iss), foundIss); err != nil {
-			if errors.IsNotFound(err) {
-				if err := r.Create(ctx, iss); err != nil {
-					log.Info("error creating ipfs statefulset", "err", err)
-					requeue = true
-				}
-			} else {
-				requeue = true
-			}
-		} else {
-			r.Update(ctx, iss)
-		}
+	clusSec, err := newClusterSecret()
+	if err != nil {
+		log.Error(err, "cannot generate new cluster secret")
+		return ctrl.Result{}, nil
 	}
 
-	{
-		// create or update css
-		css := r.cSSGenerate(instance)
-		foundCss := new(appsv1.StatefulSet)
-		if err := r.Get(ctx, client.ObjectKeyFromObject(css), foundCss); err != nil {
-			if errors.IsNotFound(err) {
-				if err := r.Create(ctx, css); err != nil {
-					log.Info("error creating cluster statefulset", "err", err)
-					requeue = true
-				}
-			} else {
-				requeue = true
-			}
-		} else {
-			r.Update(ctx, css)
-		}
-	}
+	sa := r.serviceAccount(instance)
+	svc, svcName := r.serviceCluster(instance)
+	cmScripts, cmScriptName := r.configMapScripts(instance)
+	cmConfig, cmConfigName := r.configMapConfig(instance, peerid.String())
+	secConfig, secConfigName := r.secretConfig(instance, []byte(clusSec), privBytes)
+	sset := r.statefulSet(instance, svcName, secConfigName, cmConfigName, cmScriptName)
 
-	{
-		// create or update service account
-		sa := r.saGenerate(instance)
-		foundSa := new(corev1.ServiceAccount)
-		if err := r.Get(ctx, client.ObjectKeyFromObject(sa), foundSa); err != nil {
-			if errors.IsNotFound(err) {
-				if err := r.Create(ctx, sa); err != nil {
-					log.Info("error creating service account", "err", err)
-					requeue = true
-				}
-			} else {
-				requeue = true
-			}
-		} else {
-			r.Update(ctx, sa)
-		}
-	}
-
-	{
-		// create or update cluster service
-		csvc := r.csvcGenerate(instance)
-		foundCsvc := new(corev1.ServiceAccount)
-		if err := r.Get(ctx, client.ObjectKeyFromObject(csvc), foundCsvc); err != nil {
-			if errors.IsNotFound(err) {
-				if err := r.Create(ctx, csvc); err != nil {
-					log.Info("error creating cluster service", "err", err)
-					requeue = true
-				}
-			} else {
-				requeue = true
-			}
-		} else {
-			r.Update(ctx, csvc)
-		}
-	}
-
-	{
-		// create or update IPFS service
-		isvc := r.isvcGenerate(instance)
-		foundIsvc := new(corev1.ServiceAccount)
-		if err := r.Get(ctx, client.ObjectKeyFromObject(isvc), foundIsvc); err != nil {
-			if errors.IsNotFound(err) {
-				if err := r.Create(ctx, isvc); err != nil {
-					log.Info("error creating IPFS service", "err", err)
-					requeue = true
-				}
-			} else {
-				requeue = true
-			}
-		} else {
-			r.Update(ctx, isvc)
-		}
-	}
-
-	{
-		// create or update ingress
-		ingress := r.ingressGenerate(instance)
-		foundIngress := new(networkingv1.Ingress)
-		if err := r.Get(ctx, client.ObjectKeyFromObject(ingress), foundIngress); err != nil {
-			if errors.IsNotFound(err) {
-				if err := r.Create(ctx, ingress); err != nil {
-					log.Info("error creating ingress", "err", err)
-					requeue = true
-				}
-			} else {
-				requeue = true
-			}
-		} else {
-			r.Update(ctx, ingress)
-		}
-	}
+	err = r.Create(ctx, sa)
+	log.Info("sa", "err", err)
+	err = r.Create(ctx, svc)
+	log.Info("svc", "err", err)
+	err = r.Create(ctx, cmScripts)
+	log.Info("cmScripts", "err", err)
+	r.Create(ctx, cmConfig)
+	log.Info("cmConfig", "err", err)
+	r.Create(ctx, secConfig)
+	log.Info("secConfig", "err", err)
+	r.Create(ctx, sset)
+	log.Info("sset", "err", err)
 
 	return ctrl.Result{
 		Requeue: requeue,
@@ -301,7 +221,7 @@ func getServiceAddress(svc *corev1.Service) string {
 	return address
 }
 
-func (r *IpfsReconciler) saGenerate(m *clusterv1alpha1.Ipfs) *corev1.ServiceAccount {
+func (r *IpfsReconciler) serviceAccount(m *clusterv1alpha1.Ipfs) *corev1.ServiceAccount {
 	// Define a new Service Account object
 	serviceAcct := &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
@@ -314,363 +234,6 @@ func (r *IpfsReconciler) saGenerate(m *clusterv1alpha1.Ipfs) *corev1.ServiceAcco
 	return serviceAcct
 }
 
-// Generate the statefulset object
-func (r *IpfsReconciler) iSSGenerate(m *clusterv1alpha1.Ipfs) *appsv1.StatefulSet {
-	// Define a new StatefulSet object
-	replacas := int32(1)
-	ss := &appsv1.StatefulSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "ipfs-" + m.Name,
-			Namespace: m.Namespace,
-		},
-		Spec: appsv1.StatefulSetSpec{
-			Replicas: &replacas,
-			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{
-					"app.kubernetes.io/name":     "ipfs-cluster-" + m.Name,
-					"app.kubernetes.io/instance": "ipfs-cluster-" + m.Name,
-					"nodeType":                   "ipfs",
-				},
-			},
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"app.kubernetes.io/name":     "ipfs-cluster-" + m.Name,
-						"app.kubernetes.io/instance": "ipfs-cluster-" + m.Name,
-						"nodeType":                   "ipfs",
-					},
-				},
-				Spec: corev1.PodSpec{
-					ServiceAccountName: "ipfs-cluster-" + m.Name,
-					Containers: []corev1.Container{
-						{
-							Name:            "ipfs",
-							Image:           "quay.io/redhat-et-ipfs/ipfs:v0.12.2",
-							ImagePullPolicy: corev1.PullIfNotPresent,
-							Env: []corev1.EnvVar{
-								{
-									Name:  "IPFS_PROFILE",
-									Value: "flatfs",
-								},
-								{
-									Name:  "IPFS_ADDITIONAL_ANNOUNCE",
-									Value: m.Status.Address,
-								},
-							},
-							Ports: []corev1.ContainerPort{
-								{
-									Name:          "swarm",
-									ContainerPort: 4001,
-									Protocol:      corev1.ProtocolTCP,
-								},
-								{
-									Name:          "zeroconf",
-									ContainerPort: 5353,
-									Protocol:      corev1.ProtocolUDP,
-								},
-								{
-									Name:          "api",
-									ContainerPort: 5001,
-									Protocol:      corev1.ProtocolTCP,
-								},
-								{
-									Name:          "http",
-									ContainerPort: 8080,
-									Protocol:      corev1.ProtocolTCP,
-								},
-							},
-							VolumeMounts: []corev1.VolumeMount{
-								{
-									Name:      "ipfs-storage",
-									MountPath: "/data/ipfs",
-								},
-							},
-						},
-					},
-				},
-			},
-			VolumeClaimTemplates: []corev1.PersistentVolumeClaim{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "ipfs-storage",
-					},
-					Spec: corev1.PersistentVolumeClaimSpec{
-						AccessModes: []corev1.PersistentVolumeAccessMode{
-							corev1.ReadWriteOnce,
-						},
-						Resources: corev1.ResourceRequirements{
-							Requests: corev1.ResourceList{
-								corev1.ResourceStorage: resource.MustParse(m.Spec.IpfsStorage),
-							},
-						},
-					},
-				},
-			},
-			ServiceName:                          "ipfs-" + m.Name,
-			PodManagementPolicy:                  "",
-			UpdateStrategy:                       appsv1.StatefulSetUpdateStrategy{},
-			RevisionHistoryLimit:                 new(int32),
-			MinReadySeconds:                      0,
-			PersistentVolumeClaimRetentionPolicy: &appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{},
-		},
-	}
-	// StatefulSet reconcile finished
-	ctrl.SetControllerReference(m, ss, r.Scheme)
-	return ss
-}
-
-// Generate the statefulset object
-func (r *IpfsReconciler) cSSGenerate(m *clusterv1alpha1.Ipfs) *appsv1.StatefulSet {
-	replacas := int32(1)
-	// Define a new StatefulSet object
-	ss := &appsv1.StatefulSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "cluster-" + m.Name,
-			Namespace: m.Namespace,
-		},
-		Spec: appsv1.StatefulSetSpec{
-			Replicas: &replacas,
-			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{
-					"app.kubernetes.io/name":     "ipfs-cluster-" + m.Name,
-					"app.kubernetes.io/instance": "ipfs-cluster-" + m.Name,
-					"nodeType":                   "cluster",
-				},
-			},
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"app.kubernetes.io/name":     "ipfs-cluster-" + m.Name,
-						"app.kubernetes.io/instance": "ipfs-cluster-" + m.Name,
-						"nodeType":                   "cluster",
-					},
-				},
-				Spec: corev1.PodSpec{
-					ServiceAccountName: "ipfs-cluster-" + m.Name,
-					Containers: []corev1.Container{
-						{
-							Name: "cluster-" + m.Name,
-							Env: []corev1.EnvVar{
-								{
-									Name:  "CLUSTER_PEERNAME",
-									Value: "cluster-0",
-								},
-								{
-									Name:  "CLUSTER_IPFSHTTP_NODEMULTIADDRESS",
-									Value: "/dns4/ipfs-" + m.Name + "." + m.Namespace + ".svc.cluster.local/tcp/5001",
-								},
-								{
-									Name:  "CLUSTER_CRDT_TRUSTEDPEERS",
-									Value: "*",
-								},
-								{
-									Name:  "CLUSTER_RESTAPI_HTTPLISTENMULTIADDRESS",
-									Value: "/ip4/0.0.0.0/tcp/9094",
-								},
-								{
-									Name:  "CLUSTER_MONITORPINGINTERVAL",
-									Value: "2s",
-								},
-							},
-							Image:           "quay.io/redhat-et-ipfs/cluster:v1.0.0",
-							ImagePullPolicy: corev1.PullIfNotPresent,
-							Ports: []corev1.ContainerPort{
-								{
-									Name:          "p2p",
-									ContainerPort: 9096,
-									Protocol:      corev1.ProtocolTCP,
-								},
-							},
-							VolumeMounts: []corev1.VolumeMount{
-								{
-									Name:      "ipfs-storage",
-									MountPath: "/data/ipfs-cluster",
-								},
-							},
-						},
-					},
-				},
-			},
-			VolumeClaimTemplates: []corev1.PersistentVolumeClaim{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "ipfs-storage",
-					},
-					Spec: corev1.PersistentVolumeClaimSpec{
-						AccessModes: []corev1.PersistentVolumeAccessMode{
-							corev1.ReadWriteOnce,
-						},
-						Resources: corev1.ResourceRequirements{
-							Requests: corev1.ResourceList{
-								corev1.ResourceStorage: resource.MustParse(m.Spec.ClusterStorage),
-							},
-						},
-					},
-				},
-			},
-			ServiceName:                          "cluster-" + m.Name,
-			PodManagementPolicy:                  "",
-			UpdateStrategy:                       appsv1.StatefulSetUpdateStrategy{},
-			RevisionHistoryLimit:                 new(int32),
-			MinReadySeconds:                      0,
-			PersistentVolumeClaimRetentionPolicy: &appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{},
-		},
-	}
-	// StatefulSet reconcile finished
-	ctrl.SetControllerReference(m, ss, r.Scheme)
-	return ss
-}
-
-func (r *IpfsReconciler) ingressGenerate(m *clusterv1alpha1.Ipfs) *networkingv1.Ingress {
-	PathTypeImplementationSpecific := networkingv1.PathType("ImplementationSpecific")
-	ingress := &networkingv1.Ingress{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "ipfs-cluster-" + m.Name,
-			Namespace: m.Namespace,
-			Labels: map[string]string{
-				"app.kubernetes.io/name":     "ipfs-cluster-" + m.Name,
-				"app.kubernetes.io/instance": "ipfs-cluster-" + m.Name,
-				"nodeType":                   "ipfs",
-			},
-		},
-		Spec: networkingv1.IngressSpec{
-			Rules: []networkingv1.IngressRule{
-				{
-					Host: "ipfs-cluster-" + m.Namespace + "." + m.Spec.URL,
-					IngressRuleValue: networkingv1.IngressRuleValue{
-						HTTP: &networkingv1.HTTPIngressRuleValue{
-							Paths: []networkingv1.HTTPIngressPath{
-								{
-									PathType: &PathTypeImplementationSpecific,
-
-									Path: "/",
-									Backend: networkingv1.IngressBackend{
-										Service: &networkingv1.IngressServiceBackend{
-											Name: "ipfs-cluster-" + m.Name,
-											Port: networkingv1.ServiceBackendPort{
-												Number: 8080,
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-	// Service reconcile finished
-	ctrl.SetControllerReference(m, ingress, r.Scheme)
-	return ingress
-}
-
-func (r *IpfsReconciler) csvcGenerate(m *clusterv1alpha1.Ipfs) *corev1.Service {
-	// Define a new service and generate secret
-	service := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "ipfs-cluster-" + m.Name,
-			Namespace: m.Namespace,
-			Labels: map[string]string{
-				"app.kubernetes.io/name":     "ipfs-cluster-" + m.Name,
-				"app.kubernetes.io/instance": "ipfs-cluster-" + m.Name,
-				"nodeType":                   "cluster",
-			},
-		},
-		Spec: corev1.ServiceSpec{
-			Ports: []corev1.ServicePort{
-				{
-					Port: 9096,
-					Name: "p2p",
-				},
-			},
-			Selector: map[string]string{
-				"app.kubernetes.io/name":     "ipfs-cluster-" + m.Name,
-				"app.kubernetes.io/instance": "ipfs-cluster-" + m.Name,
-				"nodeType":                   "cluster",
-			},
-		},
-	}
-	// Service reconcile finished
-	ctrl.SetControllerReference(m, service, r.Scheme)
-	return service
-}
-
-func (r *IpfsReconciler) isvcGenerate(m *clusterv1alpha1.Ipfs) *corev1.Service {
-	// Define a new service and generate secret
-	service := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "ipfs-" + m.Name,
-			Namespace: m.Namespace,
-			Labels: map[string]string{
-				"app.kubernetes.io/name":     "ipfs-cluster-" + m.Name,
-				"app.kubernetes.io/instance": "ipfs-cluster-" + m.Name,
-				"nodeType":                   "ipfs",
-			},
-		},
-		Spec: corev1.ServiceSpec{
-			Ports: []corev1.ServicePort{
-				{
-					Port: 4001,
-					Name: "swarm",
-				},
-				{
-					Port: 5001,
-					Name: "api",
-				},
-				{
-					Port: 8080,
-					Name: "gateway",
-				},
-			},
-			Selector: map[string]string{
-				"app.kubernetes.io/name":     "ipfs-cluster-" + m.Name,
-				"app.kubernetes.io/instance": "ipfs-cluster-" + m.Name,
-				"nodeType":                   "ipfs",
-			},
-		},
-	}
-	// Service reconcile finished
-	ctrl.SetControllerReference(m, service, r.Scheme)
-	return service
-}
-
-func (r *IpfsReconciler) pubSvcGenerate(m *clusterv1alpha1.Ipfs) *corev1.Service {
-	// Define a new service and generate secret
-	service := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "public-gateway-" + m.Name,
-			Namespace: m.Namespace,
-			Annotations: map[string]string{
-				"service.beta.kubernetes.io/aws-load-balancer-type":   "nlb",
-				"service.beta.kubernetes.io/aws-load-balancer-scheme": "internet-facing",
-			},
-			Labels: map[string]string{
-				"app.kubernetes.io/name":     "ipfs-cluster-" + m.Name,
-				"app.kubernetes.io/instance": "ipfs-cluster-" + m.Name,
-				"nodeType":                   "ipfs",
-			},
-		},
-		Spec: corev1.ServiceSpec{
-			Type: corev1.ServiceTypeLoadBalancer,
-			Ports: []corev1.ServicePort{
-				{
-					Port: 4001,
-					Name: "swarm",
-				},
-			},
-			Selector: map[string]string{
-				"app.kubernetes.io/name":     "ipfs-cluster-" + m.Name,
-				"app.kubernetes.io/instance": "ipfs-cluster-" + m.Name,
-				"nodeType":                   "ipfs",
-			},
-		},
-	}
-	// Service reconcile finished
-	ctrl.SetControllerReference(m, service, r.Scheme)
-	return service
-}
-
 // SetupWithManager sets up the controller with the Manager.
 func (r *IpfsReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
@@ -678,7 +241,30 @@ func (r *IpfsReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&appsv1.StatefulSet{}, builder.OnlyMetadata).
 		Owns(&corev1.Service{}, builder.OnlyMetadata).
 		Owns(&corev1.ServiceAccount{}, builder.OnlyMetadata).
+		Owns(&corev1.Secret{}, builder.OnlyMetadata).
+		Owns(&corev1.ConfigMap{}, builder.OnlyMetadata).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: 5,
 		}).Complete(r)
+}
+
+func newClusterSecret() (string, error) {
+	buf := make([]byte, 32)
+	_, err := mrand.Read(buf)
+	if err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(buf), nil
+}
+
+func newKey() (ci.PrivKey, peer.ID, error) {
+	priv, pub, err := ci.GenerateKeyPair(ci.Ed25519, 4096)
+	if err != nil {
+		return nil, "", err
+	}
+	peerid, err := peer.IDFromPublicKey(pub)
+	if err != nil {
+		return nil, "", err
+	}
+	return priv, peerid, nil
 }

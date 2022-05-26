@@ -63,7 +63,7 @@ func (r *IpfsReconciler) serviceCluster(m *clusterv1alpha1.Ipfs) (*corev1.Servic
 				},
 			},
 			Selector: map[string]string{
-				"app": "ipfs-cluster",
+				"app.kubernetes.io/name": "ipfs-cluster-" + m.Name,
 			},
 		},
 	}

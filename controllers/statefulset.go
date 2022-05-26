@@ -102,8 +102,8 @@ func (r *IpfsReconciler) statefulSet(m *clusterv1alpha1.Ipfs,
 									},
 								},
 								InitialDelaySeconds: 30,
-								TimeoutSeconds:      5,
-								PeriodSeconds:       15,
+								TimeoutSeconds:      10,
+								PeriodSeconds:       60,
 							},
 							VolumeMounts: []corev1.VolumeMount{
 								{
@@ -117,6 +117,10 @@ func (r *IpfsReconciler) statefulSet(m *clusterv1alpha1.Ipfs,
 							Name:            "ipfs-cluster",
 							Image:           "ipfs/ipfs-cluster:v1.0.1",
 							ImagePullPolicy: corev1.PullIfNotPresent,
+							Command: []string{
+								"sh",
+								"/custom/entrypoint.sh",
+							},
 							Env: []corev1.EnvVar{
 								{
 									Name: "BOOTSTRAP_PEER_ID",
@@ -151,6 +155,14 @@ func (r *IpfsReconciler) statefulSet(m *clusterv1alpha1.Ipfs,
 										},
 									},
 								},
+								{
+									Name:  "CLUSTER_MONITOR_PING_INTERVAL",
+									Value: "3m",
+								},
+								{
+									Name:  "SVC_NAME",
+									Value: m.Name,
+								},
 							},
 							Ports: []corev1.ContainerPort{
 								{
@@ -175,14 +187,18 @@ func (r *IpfsReconciler) statefulSet(m *clusterv1alpha1.Ipfs,
 										Port: intstr.FromString("cluster-swarm"),
 									},
 								},
-								InitialDelaySeconds: 5,
-								TimeoutSeconds:      5,
-								PeriodSeconds:       10,
+								InitialDelaySeconds: 30,
+								TimeoutSeconds:      10,
+								PeriodSeconds:       60,
 							},
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      "cluster-storage",
 									MountPath: "/data/ipfs-cluster",
+								},
+								{
+									Name:      "configure-script",
+									MountPath: "custom",
 								},
 							},
 							Resources: corev1.ResourceRequirements{},

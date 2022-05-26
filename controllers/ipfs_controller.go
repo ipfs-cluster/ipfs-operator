@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	crand "crypto/rand"
+	"encoding/base64"
 	"encoding/binary"
 	"encoding/hex"
 	mrand "math/rand"
@@ -128,6 +129,7 @@ func (r *IpfsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		log.Error(err, "cannot get bytes from private key")
 		return ctrl.Result{}, nil
 	}
+	privStr := base64.StdEncoding.EncodeToString(privBytes)
 
 	clusSec, err := newClusterSecret()
 	if err != nil {
@@ -139,7 +141,7 @@ func (r *IpfsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	svc, svcName := r.serviceCluster(instance)
 	cmScripts, cmScriptName := r.configMapScripts(instance)
 	cmConfig, cmConfigName := r.configMapConfig(instance, peerid.String())
-	secConfig, secConfigName := r.secretConfig(instance, []byte(clusSec), privBytes)
+	secConfig, secConfigName := r.secretConfig(instance, []byte(clusSec), []byte(privStr))
 	sset := r.statefulSet(instance, svcName, secConfigName, cmConfigName, cmScriptName)
 
 	err = r.Create(ctx, sa)

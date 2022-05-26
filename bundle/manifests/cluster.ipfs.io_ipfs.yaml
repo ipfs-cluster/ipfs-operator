@@ -39,18 +39,24 @@ spec:
                 type: string
               public:
                 type: boolean
+              replicas:
+                format: int32
+                type: integer
               url:
                 type: string
             required:
             - clusterStorage
             - ipfsStorage
             - public
+            - replicas
             - url
             type: object
           status:
             properties:
-              address:
-                type: string
+              addresses:
+                items:
+                  type: string
+                type: array
               conditions:
                 items:
                   description: "Condition contains details for one aspect of the current

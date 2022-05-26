@@ -24,13 +24,13 @@ fi
 
 PEER_HOSTNAME=$(cat /proc/sys/kernel/hostname)
 
-grep -q ".*ipfs-cluster-0.*" /proc/sys/kernel/hostname
+grep -q ".*-0$" /proc/sys/kernel/hostname
 if [ $? -eq 0 ]; then
 	CLUSTER_ID=${BOOTSTRAP_PEER_ID} \
 	CLUSTER_PRIVATEKEY=${BOOTSTRAP_PEER_PRIV_KEY} \
 	exec ipfs-cluster-service daemon --upgrade
 else
-	BOOTSTRAP_ADDR=/dns4/${SVC_NAME}-0/tcp/9096/ipfs/${BOOTSTRAP_PEER_ID}
+	BOOTSTRAP_ADDR=/dns4/ipfs-cluster-${SVC_NAME}/tcp/9096/ipfs/${BOOTSTRAP_PEER_ID}
 
 	if [ -z $BOOTSTRAP_ADDR ]; then
 		exit 1

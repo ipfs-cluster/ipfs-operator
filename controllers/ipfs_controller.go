@@ -103,18 +103,8 @@ func (r *IpfsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	}
 
 	if instance.DeletionTimestamp != nil {
-		// clean up
-		err := r.CleanUpOpjects(ctx, instance)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-
 		controllerutil.RemoveFinalizer(instance, finalizer)
-		err = r.Update(ctx, instance)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-		return ctrl.Result{}, nil
+		return ctrl.Result{}, r.Update(ctx, instance)
 	}
 
 	var requeue bool
@@ -160,51 +150,6 @@ func (r *IpfsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	return ctrl.Result{
 		Requeue: requeue,
 	}, nil
-}
-
-func (r *IpfsReconciler) CleanUpOpjects(ctx context.Context, instance *clusterv1alpha1.Ipfs) error {
-	// Delete all the objects that we created to make sure that things are removed.
-	err := r.Delete(ctx, &appsv1.StatefulSet{ObjectMeta: metav1.ObjectMeta{Name: "ipfs-" + instance.Name, Namespace: instance.Namespace}}, client.PropagationPolicy(metav1.DeletePropagationBackground))
-	if err != nil && !(errors.IsGone(err) || errors.IsNotFound(err)) {
-		return err
-	}
-
-	err = r.Delete(ctx, &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "ipfs-cluster-" + instance.Name, Namespace: instance.Namespace}})
-	if err != nil && !(errors.IsGone(err) || errors.IsNotFound(err)) {
-		return err
-	}
-
-	err = r.Delete(ctx, &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "ipfs-cluster-" + instance.Name, Namespace: instance.Namespace}})
-	if err != nil && !(errors.IsGone(err) || errors.IsNotFound(err)) {
-		return err
-	}
-
-	err = r.Delete(ctx, &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "cluster-0-ipfs-cluster-" + instance.Name, Namespace: instance.Namespace}})
-	if err != nil && !(errors.IsGone(err) || errors.IsNotFound(err)) {
-		return err
-	}
-
-	err = r.Delete(ctx, &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "public-gateway-" + instance.Name, Namespace: instance.Namespace}})
-	if err != nil && !(errors.IsGone(err) || errors.IsNotFound(err)) {
-		return err
-	}
-
-	err = r.Delete(ctx, &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "ipfs-storage-cluster-" + instance.Name, Namespace: instance.Namespace}})
-	if err != nil && !(errors.IsGone(err) || errors.IsNotFound(err)) {
-		return err
-	}
-
-	err = r.Delete(ctx, &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "ipfs-storage-ipfs-" + instance.Name, Namespace: instance.Namespace}})
-	if err != nil && !(errors.IsGone(err) || errors.IsNotFound(err)) {
-		return err
-	}
-
-	err = r.Delete(ctx, &appsv1.StatefulSet{ObjectMeta: metav1.ObjectMeta{Name: "cluster-" + instance.Name, Namespace: instance.Namespace}})
-	if err != nil && !(errors.IsGone(err) || errors.IsNotFound(err)) {
-		return err
-	}
-
-	return nil
 }
 
 func getServiceAddress(svc *corev1.Service) string {

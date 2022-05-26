@@ -103,8 +103,18 @@ func (r *IpfsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	}
 
 	if instance.DeletionTimestamp != nil {
+		// clean up
+		// err := r.CleanUpOpjects(ctx, instance)
+		// if err != nil {
+		// 	return ctrl.Result{}, err
+		// }
+
 		controllerutil.RemoveFinalizer(instance, finalizer)
-		return ctrl.Result{}, r.Update(ctx, instance)
+		err := r.Update(ctx, instance)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{}, nil
 	}
 
 	priv, peerid, err := newKey()
@@ -132,59 +142,78 @@ func (r *IpfsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	secConfig, secConfigName := r.secretConfig(instance, []byte(clusSec), []byte(privStr))
 	sset := r.statefulSet(instance, svcName, secConfigName, cmConfigName, cmScriptName)
 
-	requeue := false
-	requeue = requeue || r.createOrPatch(ctx, sa, sa.DeepCopy(), "service account") != nil
-	requeue = requeue || r.createOrPatch(ctx, svc, svc.DeepCopy(), "service") != nil
-	requeue = requeue || r.createOrPatch(ctx, cmScripts, cmScripts.DeepCopy(), "scripts configmap") != nil
-	requeue = requeue || r.createOrPatch(ctx, cmConfig, cmConfig.DeepCopy(), "config configmap") != nil
-	requeue = requeue || r.createOrPatch(ctx, secConfig, secConfig.DeepCopy(), "config secret") != nil
-	requeue = requeue || r.createOrPatch(ctx, sset, sset.DeepCopy(), "statefulset") != nil
+	var requeue bool
+	requeue = requeue || r.createOrUpdate(ctx, sa, "service account") != nil
+	requeue = requeue || r.createOrUpdate(ctx, svc, "service") != nil
+	requeue = requeue || r.createOrUpdate(ctx, cmScripts, "scripts configmap") != nil
+	requeue = requeue || r.createOrUpdate(ctx, cmConfig, "config configmap") != nil
+	requeue = requeue || r.createOrUpdate(ctx, secConfig, "config secret") != nil
+	requeue = requeue || r.createOrUpdate(ctx, sset, "statefulset") != nil
 
-	// requeue = requeue || r.createOrUpdate(ctx, sa, "service account") != nil
-	// requeue = requeue || r.createOrUpdate(ctx, svc, "service") != nil
-	// requeue = requeue || r.createOrUpdate(ctx, cmScripts, "scripts configmap") != nil
-	// requeue = requeue || r.createOrUpdate(ctx, cmConfig, "config configmap") != nil
-	// requeue = requeue || r.createOrUpdate(ctx, secConfig, "config secret") != nil
-	// requeue = requeue || r.createOrUpdate(ctx, sset, "statefulset") != nil
-	return ctrl.Result{Requeue: requeue}, nil
+	return ctrl.Result{
+		Requeue: requeue,
+	}, nil
 }
 
-func (r *IpfsReconciler) createOrPatch(ctx context.Context, obj, rcvr client.Object, name string) error {
-	log := ctrllog.FromContext(ctx)
-	if err := r.Create(ctx, obj); err != nil {
-		if errors.IsAlreadyExists(err) {
-			key := client.ObjectKeyFromObject(obj)
-			if err := r.Get(ctx, key, rcvr); err != nil {
-				log.Error(err, "error retreiving existing endpoing")
-				return err
-			}
-			p := client.MergeFrom(obj)
-			if err := r.Patch(ctx, rcvr, p); err != nil {
-				log.Error(err, "error updating "+name, "err", err)
-				return err
-			}
-		} else {
-			log.Error(err, "error creating "+name, "err", nil)
-			return err
-		}
-	}
-	return nil
-}
+// func (r *IpfsReconciler) CleanUpOpjects(ctx context.Context, instance *clusterv1alpha1.Ipfs) error {
+// 	// Delete all the objects that we created to make sure that things are removed.
+// 	err := r.Delete(ctx, &appsv1.StatefulSet{ObjectMeta: metav1.ObjectMeta{Name: "ipfs-" + instance.Name, Namespace: instance.Namespace}}, client.PropagationPolicy(metav1.DeletePropagationBackground))
+// 	if err != nil && !(errors.IsGone(err) || errors.IsNotFound(err)) {
+// 		return err
+// 	}
 
-func (r *IpfsReconciler) createOrUpdate(ctx context.Context, obj client.Object, name string) error {
-	log := ctrllog.FromContext(ctx)
-	if err := r.Create(ctx, obj); err != nil {
-		if errors.IsAlreadyExists(err) {
-			if err := r.Update(ctx, obj); err != nil {
-				log.Error(err, "error updating "+name, "err", err)
-				return err
+// 	err = r.Delete(ctx, &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "ipfs-cluster-" + instance.Name, Namespace: instance.Namespace}})
+// 	if err != nil && !(errors.IsGone(err) || errors.IsNotFound(err)) {
+// 		return err
+// 	}
+
+// 	err = r.Delete(ctx, &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "ipfs-cluster-" + instance.Name, Namespace: instance.Namespace}})
+// 	if err != nil && !(errors.IsGone(err) || errors.IsNotFound(err)) {
+// 		return err
+// 	}
+
+// 	err = r.Delete(ctx, &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "cluster-0-ipfs-cluster-" + instance.Name, Namespace: instance.Namespace}})
+// 	if err != nil && !(errors.IsGone(err) || errors.IsNotFound(err)) {
+// 		return err
+// 	}
+
+// 	err = r.Delete(ctx, &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "public-gateway-" + instance.Name, Namespace: instance.Namespace}})
+// 	if err != nil && !(errors.IsGone(err) || errors.IsNotFound(err)) {
+// 		return err
+// 	}
+
+// 	err = r.Delete(ctx, &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "ipfs-storage-cluster-" + instance.Name, Namespace: instance.Namespace}})
+// 	if err != nil && !(errors.IsGone(err) || errors.IsNotFound(err)) {
+// 		return err
+// 	}
+
+// 	err = r.Delete(ctx, &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "ipfs-storage-ipfs-" + instance.Name, Namespace: instance.Namespace}})
+// 	if err != nil && !(errors.IsGone(err) || errors.IsNotFound(err)) {
+// 		return err
+// 	}
+
+// 	err = r.Delete(ctx, &appsv1.StatefulSet{ObjectMeta: metav1.ObjectMeta{Name: "cluster-" + instance.Name, Namespace: instance.Namespace}})
+// 	if err != nil && !(errors.IsGone(err) || errors.IsNotFound(err)) {
+// 		return err
+// 	}
+
+// 	return nil
+// }
+
+func getServiceAddress(svc *corev1.Service) string {
+	address := svc.Spec.ClusterIP
+	if svc.Spec.Type == corev1.ServiceTypeLoadBalancer {
+		if len(svc.Status.LoadBalancer.Ingress) > 0 {
+			if svc.Status.LoadBalancer.Ingress[0].Hostname != "" {
+				address = svc.Status.LoadBalancer.Ingress[0].Hostname
+			} else if svc.Status.LoadBalancer.Ingress[0].IP != "" {
+				address = svc.Status.LoadBalancer.Ingress[0].IP
 			}
 		} else {
-			log.Error(err, "error creating "+name, "err", nil)
-			return err
+			address = ""
 		}
 	}
-	return nil
+	return address
 }
 
 func (r *IpfsReconciler) serviceAccount(m *clusterv1alpha1.Ipfs) *corev1.ServiceAccount {
@@ -233,4 +262,17 @@ func newKey() (ci.PrivKey, peer.ID, error) {
 		return nil, "", err
 	}
 	return priv, peerid, nil
+}
+
+func (r *IpfsReconciler) createOrUpdate(ctx context.Context, obj client.Object, name string) error {
+	log := ctrllog.FromContext(ctx)
+	if err := r.Create(ctx, obj); err != nil {
+		if err := r.Update(ctx, obj); err != nil {
+			log.Error(err, "error updating "+name)
+		}
+	} else {
+		log.Error(err, "error updating "+name)
+		return err
+	}
+	return nil
 }

@@ -22,8 +22,8 @@ func (r *IpfsReconciler) secretConfig(m *clusterv1alpha1.Ipfs, sec *corev1.Secre
 		},
 	}
 	expected.DeepCopyInto(sec)
+	ctrl.SetControllerReference(m, sec, r.Scheme)
 	return func() error {
-		expected.DeepCopyInto(sec)
-		return ctrl.SetControllerReference(m, sec, r.Scheme)
+		return nil
 	}, secName
 }

@@ -17,8 +17,8 @@ func (r *IpfsReconciler) serviceAccount(m *clusterv1alpha1.Ipfs, sa *corev1.Serv
 		},
 	}
 	expected.DeepCopyInto(sa)
+	ctrl.SetControllerReference(m, sa, r.Scheme)
 	return func() error {
-		expected.DeepCopyInto(sa)
-		return ctrl.SetControllerReference(m, sa, r.Scheme)
+		return nil
 	}
 }

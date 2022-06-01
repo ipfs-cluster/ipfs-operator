@@ -18,11 +18,7 @@ package controllers
 
 import (
 	"context"
-	crand "crypto/rand"
 	"encoding/base64"
-	"encoding/binary"
-	"encoding/hex"
-	mrand "math/rand"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -36,21 +32,7 @@ import (
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
 	clusterv1alpha1 "github.com/redhat-et/ipfs-operator/api/v1alpha1"
-
-	ci "github.com/libp2p/go-libp2p-crypto"
-	peer "github.com/libp2p/go-libp2p-peer"
 )
-
-func init() {
-	seed := make([]byte, 8)
-	_, err := crand.Read(seed)
-	if err != nil {
-		panic(err)
-	}
-
-	useed, _ := binary.Uvarint(seed)
-	mrand.Seed(int64(useed))
-}
 
 const (
 	finalizer = "openshift.ifps.cluster"
@@ -149,13 +131,14 @@ func (r *IpfsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 
 	var requeue bool
 	for obj, mut := range trackedObjects {
-		log.Info("wtf", "obj", obj, "name", obj.GetName())
-		result, err := controllerutil.CreateOrUpdate(ctx, r.Client, obj, mut)
+		kind := obj.GetObjectKind().GroupVersionKind()
+		name := obj.GetName()
+		result, err := controllerutil.CreateOrPatch(ctx, r.Client, obj, mut)
 		if err != nil {
-			log.Error(err, "error creating object", "result", result)
+			log.Error(err, "error creating object", "objname", name, "objKind", kind.Kind, "result", result)
 			requeue = true
 		} else {
-			log.Info("object changed", "name", obj.GetName(), "result", result)
+			log.Info("object changed", "objName", name, "objKind", kind.Kind, "result", result)
 		}
 	}
 	return ctrl.Result{Requeue: requeue}, nil
@@ -173,25 +156,4 @@ func (r *IpfsReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: 1,
 		}).Complete(r)
-}
-
-func newClusterSecret() (string, error) {
-	buf := make([]byte, 32)
-	_, err := mrand.Read(buf)
-	if err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(buf), nil
-}
-
-func newKey() (ci.PrivKey, peer.ID, error) {
-	priv, pub, err := ci.GenerateKeyPair(ci.Ed25519, 4096)
-	if err != nil {
-		return nil, "", err
-	}
-	peerid, err := peer.IDFromPublicKey(pub)
-	if err != nil {
-		return nil, "", err
-	}
-	return priv, peerid, nil
 }

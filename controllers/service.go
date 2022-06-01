@@ -69,8 +69,9 @@ func (r *IpfsReconciler) serviceCluster(m *clusterv1alpha1.Ipfs, svc *corev1.Ser
 		},
 	}
 	expected.DeepCopyInto(svc)
+	ctrl.SetControllerReference(m, svc, r.Scheme)
 	return func() error {
-		expected.DeepCopyInto(svc)
-		return ctrl.SetControllerReference(m, svc, r.Scheme)
+		svc.Spec = expected.Spec
+		return nil
 	}, svcName
 }

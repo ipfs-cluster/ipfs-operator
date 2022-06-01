@@ -80,8 +80,8 @@ func (r *IpfsReconciler) configMapScripts(m *clusterv1alpha1.Ipfs, cm *corev1.Co
 		},
 	}
 	expected.DeepCopyInto(cm)
+	ctrl.SetControllerReference(m, cm, r.Scheme)
 	return func() error {
-		expected.DeepCopyInto(cm)
-		return ctrl.SetControllerReference(m, cm, r.Scheme)
+		return nil
 	}, cmName
 }

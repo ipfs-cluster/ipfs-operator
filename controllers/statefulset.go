@@ -7,17 +7,19 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	clusterv1alpha1 "github.com/redhat-et/ipfs-operator/api/v1alpha1"
 )
 
 func (r *IpfsReconciler) statefulSet(m *clusterv1alpha1.Ipfs,
+	sts *appsv1.StatefulSet,
 	serviceName string,
 	secretName string,
 	configMapName string,
-	configMapBootstrapScriptName string) *appsv1.StatefulSet {
+	configMapBootstrapScriptName string) controllerutil.MutateFn {
 	ssName := "ipfs-cluster-" + m.Name
-	ss := &appsv1.StatefulSet{
+	expected := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      ssName,
 			Namespace: m.Namespace,
@@ -161,7 +163,7 @@ func (r *IpfsReconciler) statefulSet(m *clusterv1alpha1.Ipfs,
 								},
 								{
 									Name:  "SVC_NAME",
-									Value: m.Name,
+									Value: serviceName,
 								},
 							},
 							Ports: []corev1.ContainerPort{
@@ -253,6 +255,9 @@ func (r *IpfsReconciler) statefulSet(m *clusterv1alpha1.Ipfs,
 			ServiceName: serviceName,
 		},
 	}
-	ctrl.SetControllerReference(m, ss, r.Scheme)
-	return ss
+	expected.DeepCopyInto(sts)
+	return func() error {
+		expected.DeepCopyInto(sts)
+		return ctrl.SetControllerReference(m, sts, r.Scheme)
+	}
 }

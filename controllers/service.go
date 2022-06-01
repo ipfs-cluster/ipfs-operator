@@ -5,13 +5,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	clusterv1alpha1 "github.com/redhat-et/ipfs-operator/api/v1alpha1"
 )
 
-func (r *IpfsReconciler) serviceCluster(m *clusterv1alpha1.Ipfs) (*corev1.Service, string) {
+func (r *IpfsReconciler) serviceCluster(m *clusterv1alpha1.Ipfs, svc *corev1.Service) (controllerutil.MutateFn, string) {
 	svcName := "ipfs-cluster-" + m.Name
-	svc := &corev1.Service{
+	expected := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      svcName,
 			Namespace: m.Namespace,
@@ -67,6 +68,9 @@ func (r *IpfsReconciler) serviceCluster(m *clusterv1alpha1.Ipfs) (*corev1.Servic
 			},
 		},
 	}
-	ctrl.SetControllerReference(m, svc, r.Scheme)
-	return svc, svcName
+	expected.DeepCopyInto(svc)
+	return func() error {
+		expected.DeepCopyInto(svc)
+		return ctrl.SetControllerReference(m, svc, r.Scheme)
+	}, svcName
 }

@@ -7,4 +7,4 @@ spec:
   ipfsStorage: 20Gi
   clusterStorage: 20Gi
   public: true
-  replicas: 3
+  replicas: 2

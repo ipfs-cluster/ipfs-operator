@@ -27,7 +27,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -125,79 +124,41 @@ func (r *IpfsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		return ctrl.Result{}, nil
 	}
 
-	sa := r.serviceAccount(instance)
-	svc, svcName := r.serviceCluster(instance)
-	cmScripts, cmScriptName := r.configMapScripts(instance)
-	cmConfig, cmConfigName := r.configMapConfig(instance, peerid.String())
-	secConfig, secConfigName := r.secretConfig(instance, []byte(clusSec), []byte(privStr))
-	sset := r.statefulSet(instance, svcName, secConfigName, cmConfigName, cmScriptName)
+	sa := corev1.ServiceAccount{}
+	svc := corev1.Service{}
+	cmScripts := corev1.ConfigMap{}
+	cmConfig := corev1.ConfigMap{}
+	secConfig := corev1.Secret{}
+	sts := appsv1.StatefulSet{}
 
-	requeue := false
-	requeue = requeue || r.createOrPatch(ctx, sa, sa.DeepCopy(), "service account") != nil
-	requeue = requeue || r.createOrPatch(ctx, svc, svc.DeepCopy(), "service") != nil
-	requeue = requeue || r.createOrPatch(ctx, cmScripts, cmScripts.DeepCopy(), "scripts configmap") != nil
-	requeue = requeue || r.createOrPatch(ctx, cmConfig, cmConfig.DeepCopy(), "config configmap") != nil
-	requeue = requeue || r.createOrPatch(ctx, secConfig, secConfig.DeepCopy(), "config secret") != nil
-	requeue = requeue || r.createOrPatch(ctx, sset, sset.DeepCopy(), "statefulset") != nil
+	mutsa := r.serviceAccount(instance, &sa)
+	mutsvc, svcName := r.serviceCluster(instance, &svc)
+	mutCmScripts, cmScriptName := r.configMapScripts(instance, &cmScripts)
+	mutCmConfig, cmConfigName := r.configMapConfig(instance, &cmConfig, peerid.String())
+	mutSecConfig, secConfigName := r.secretConfig(instance, &secConfig, []byte(clusSec), []byte(privStr))
+	mutSts := r.statefulSet(instance, &sts, svcName, secConfigName, cmConfigName, cmScriptName)
 
-	// requeue = requeue || r.createOrUpdate(ctx, sa, "service account") != nil
-	// requeue = requeue || r.createOrUpdate(ctx, svc, "service") != nil
-	// requeue = requeue || r.createOrUpdate(ctx, cmScripts, "scripts configmap") != nil
-	// requeue = requeue || r.createOrUpdate(ctx, cmConfig, "config configmap") != nil
-	// requeue = requeue || r.createOrUpdate(ctx, secConfig, "config secret") != nil
-	// requeue = requeue || r.createOrUpdate(ctx, sset, "statefulset") != nil
+	trackedObjects := map[client.Object]controllerutil.MutateFn{
+		&sa:        mutsa,
+		&svc:       mutsvc,
+		&cmScripts: mutCmScripts,
+		&cmConfig:  mutCmConfig,
+		&secConfig: mutSecConfig,
+		&sts:       mutSts,
+	}
+
+	var requeue bool
+	for obj, mut := range trackedObjects {
+		log.Info("wtf", "obj", obj, "name", obj.GetName())
+		result, err := controllerutil.CreateOrUpdate(ctx, r.Client, obj, mut)
+		if err != nil {
+			log.Error(err, "error creating object", "result", result)
+			requeue = true
+		} else {
+			log.Info("object changed", "name", obj.GetName(), "result", result)
+		}
+	}
 	return ctrl.Result{Requeue: requeue}, nil
-}
-
-func (r *IpfsReconciler) createOrPatch(ctx context.Context, obj, rcvr client.Object, name string) error {
-	log := ctrllog.FromContext(ctx)
-	if err := r.Create(ctx, obj); err != nil {
-		if errors.IsAlreadyExists(err) {
-			key := client.ObjectKeyFromObject(obj)
-			if err := r.Get(ctx, key, rcvr); err != nil {
-				log.Error(err, "error retreiving existing endpoing")
-				return err
-			}
-			p := client.MergeFrom(obj)
-			if err := r.Patch(ctx, rcvr, p); err != nil {
-				log.Error(err, "error updating "+name, "err", err)
-				return err
-			}
-		} else {
-			log.Error(err, "error creating "+name, "err", nil)
-			return err
-		}
-	}
-	return nil
-}
-
-func (r *IpfsReconciler) createOrUpdate(ctx context.Context, obj client.Object, name string) error {
-	log := ctrllog.FromContext(ctx)
-	if err := r.Create(ctx, obj); err != nil {
-		if errors.IsAlreadyExists(err) {
-			if err := r.Update(ctx, obj); err != nil {
-				log.Error(err, "error updating "+name, "err", err)
-				return err
-			}
-		} else {
-			log.Error(err, "error creating "+name, "err", nil)
-			return err
-		}
-	}
-	return nil
-}
-
-func (r *IpfsReconciler) serviceAccount(m *clusterv1alpha1.Ipfs) *corev1.ServiceAccount {
-	// Define a new Service Account object
-	serviceAcct := &corev1.ServiceAccount{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "ipfs-cluster-" + m.Name,
-			Namespace: m.Namespace,
-		},
-	}
-	// Service Account reconcile finished
-	ctrl.SetControllerReference(m, serviceAcct, r.Scheme)
-	return serviceAcct
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -210,7 +171,7 @@ func (r *IpfsReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.Secret{}, builder.OnlyMetadata).
 		Owns(&corev1.ConfigMap{}, builder.OnlyMetadata).
 		WithOptions(controller.Options{
-			MaxConcurrentReconciles: 5,
+			MaxConcurrentReconciles: 1,
 		}).Complete(r)
 }
 

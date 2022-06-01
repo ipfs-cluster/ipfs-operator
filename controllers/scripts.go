@@ -6,6 +6,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	clusterv1alpha1 "github.com/redhat-et/ipfs-operator/api/v1alpha1"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 var (
@@ -30,7 +31,7 @@ if [ $? -eq 0 ]; then
 	CLUSTER_PRIVATEKEY=${BOOTSTRAP_PEER_PRIV_KEY} \
 	exec ipfs-cluster-service daemon --upgrade
 else
-	BOOTSTRAP_ADDR=/dns4/ipfs-cluster-${SVC_NAME}/tcp/9096/ipfs/${BOOTSTRAP_PEER_ID}
+	BOOTSTRAP_ADDR=/dns4/${SVC_NAME}-0.${SVC_NAME}/tcp/9096/ipfs/${BOOTSTRAP_PEER_ID}
 
 	if [ -z $BOOTSTRAP_ADDR ]; then
 		exit 1
@@ -66,9 +67,9 @@ chown -R ipfs: /data/ipfs
 `
 )
 
-func (r *IpfsReconciler) configMapScripts(m *clusterv1alpha1.Ipfs) (*corev1.ConfigMap, string) {
+func (r *IpfsReconciler) configMapScripts(m *clusterv1alpha1.Ipfs, cm *corev1.ConfigMap) (controllerutil.MutateFn, string) {
 	cmName := "ipfs-cluster-scripts-" + m.Name
-	cm := &corev1.ConfigMap{
+	expected := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cmName,
 			Namespace: m.Namespace,
@@ -78,6 +79,9 @@ func (r *IpfsReconciler) configMapScripts(m *clusterv1alpha1.Ipfs) (*corev1.Conf
 			"configure-ipfs.sh": configureIpfs,
 		},
 	}
-	ctrl.SetControllerReference(m, cm, r.Scheme)
-	return cm, cmName
+	expected.DeepCopyInto(cm)
+	return func() error {
+		expected.DeepCopyInto(cm)
+		return ctrl.SetControllerReference(m, cm, r.Scheme)
+	}, cmName
 }

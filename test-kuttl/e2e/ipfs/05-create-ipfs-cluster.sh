@@ -12,5 +12,5 @@ spec:
   ipfsStorage: 2Gi
   clusterStorage: 2Gi
   public: false
-	replicas: 2
+  replicas: 2
 EOF

@@ -12,4 +12,4 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 images:
 - name: controller
-  newName: coryschwartz/ipfs-operator
+  newName: quay.io/redhat-et-ipfs/ipfs-operator

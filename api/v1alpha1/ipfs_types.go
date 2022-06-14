@@ -33,14 +33,15 @@ const (
 
 type IpfsSpec struct {
 	URL            string `json:"url"`
+	Public         bool   `json:"public"`
 	IpfsStorage    string `json:"ipfsStorage"`
 	ClusterStorage string `json:"clusterStorage"`
-	Public         bool   `json:"public"`
+	Replicas       int32  `json:"replicas"`
 }
 
 type IpfsStatus struct {
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
-	Address    string             `json:"address,omitempty"`
+	Addresses  []string           `json:"addresses,omitempty"`
 }
 
 //+kubebuilder:object:root=true

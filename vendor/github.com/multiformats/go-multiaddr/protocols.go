@@ -5,34 +5,23 @@ package multiaddr
 const (
 	P_IP4               = 0x0004
 	P_TCP               = 0x0006
-	P_DNS               = 0x0035 // 4 or 6
-	P_DNS4              = 0x0036
-	P_DNS6              = 0x0037
-	P_DNSADDR           = 0x0038
 	P_UDP               = 0x0111
 	P_DCCP              = 0x0021
 	P_IP6               = 0x0029
 	P_IP6ZONE           = 0x002A
 	P_QUIC              = 0x01CC
 	P_SCTP              = 0x0084
-	P_CIRCUIT           = 0x0122
 	P_UDT               = 0x012D
 	P_UTP               = 0x012E
 	P_UNIX              = 0x0190
 	P_P2P               = 0x01A5
-	P_IPFS              = 0x01A5 // alias for backwards compatibility
+	P_IPFS              = 0x01A5 // alias for backwards compatability
 	P_HTTP              = 0x01E0
-	P_HTTPS             = 0x01BB // deprecated alias for /tls/http
+	P_HTTPS             = 0x01BB
 	P_ONION             = 0x01BC // also for backwards compatibility
 	P_ONION3            = 0x01BD
-	P_GARLIC64          = 0x01BE
-	P_GARLIC32          = 0x01BF
+	P_GARLIC64          = 0x01CA
 	P_P2P_WEBRTC_DIRECT = 0x0114
-	P_TLS               = 0x01c0
-	P_NOISE             = 0x01c6
-	P_WS                = 0x01DD
-	P_WSS               = 0x01DE // deprecated alias for /tls/ws
-	P_PLAINTEXTV2       = 0x706c61
 )
 
 var (
@@ -51,34 +40,6 @@ var (
 		Size:       16,
 		Path:       false,
 		Transcoder: TranscoderPort,
-	}
-	protoDNS = Protocol{
-		Code:       P_DNS,
-		Size:       LengthPrefixedVarSize,
-		Name:       "dns",
-		VCode:      CodeToVarint(P_DNS),
-		Transcoder: TranscoderDns,
-	}
-	protoDNS4 = Protocol{
-		Code:       P_DNS4,
-		Size:       LengthPrefixedVarSize,
-		Name:       "dns4",
-		VCode:      CodeToVarint(P_DNS4),
-		Transcoder: TranscoderDns,
-	}
-	protoDNS6 = Protocol{
-		Code:       P_DNS6,
-		Size:       LengthPrefixedVarSize,
-		Name:       "dns6",
-		VCode:      CodeToVarint(P_DNS6),
-		Transcoder: TranscoderDns,
-	}
-	protoDNSADDR = Protocol{
-		Code:       P_DNSADDR,
-		Size:       LengthPrefixedVarSize,
-		Name:       "dnsaddr",
-		VCode:      CodeToVarint(P_DNSADDR),
-		Transcoder: TranscoderDns,
 	}
 	protoUDP = Protocol{
 		Name:       "udp",
@@ -119,14 +80,6 @@ var (
 		Size:       16,
 		Transcoder: TranscoderPort,
 	}
-
-	protoCIRCUIT = Protocol{
-		Code:  P_CIRCUIT,
-		Size:  0,
-		Name:  "p2p-circuit",
-		VCode: CodeToVarint(P_CIRCUIT),
-	}
-
 	protoONION2 = Protocol{
 		Name:       "onion",
 		Code:       P_ONION,
@@ -147,13 +100,6 @@ var (
 		VCode:      CodeToVarint(P_GARLIC64),
 		Size:       LengthPrefixedVarSize,
 		Transcoder: TranscoderGarlic64,
-	}
-	protoGARLIC32 = Protocol{
-		Name:       "garlic32",
-		Code:       P_GARLIC32,
-		VCode:      CodeToVarint(P_GARLIC32),
-		Size:       LengthPrefixedVarSize,
-		Transcoder: TranscoderGarlic32,
 	}
 	protoUTP = Protocol{
 		Name:  "utp",
@@ -181,7 +127,7 @@ var (
 		VCode: CodeToVarint(P_HTTPS),
 	}
 	protoP2P = Protocol{
-		Name:       "p2p",
+		Name:       "ipfs",
 		Code:       P_P2P,
 		VCode:      CodeToVarint(P_P2P),
 		Size:       LengthPrefixedVarSize,
@@ -200,51 +146,20 @@ var (
 		Code:  P_P2P_WEBRTC_DIRECT,
 		VCode: CodeToVarint(P_P2P_WEBRTC_DIRECT),
 	}
-	protoTLS = Protocol{
-		Name:  "tls",
-		Code:  P_TLS,
-		VCode: CodeToVarint(P_TLS),
-	}
-	protoNOISE = Protocol{
-		Name:  "noise",
-		Code:  P_NOISE,
-		VCode: CodeToVarint(P_NOISE),
-	}
-	protoPlaintextV2 = Protocol{
-		Name:  "plaintextv2",
-		Code:  P_PLAINTEXTV2,
-		VCode: CodeToVarint(P_PLAINTEXTV2),
-	}
-	protoWS = Protocol{
-		Name:  "ws",
-		Code:  P_WS,
-		VCode: CodeToVarint(P_WS),
-	}
-	protoWSS = Protocol{
-		Name:  "wss",
-		Code:  P_WSS,
-		VCode: CodeToVarint(P_WSS),
-	}
 )
 
 func init() {
 	for _, p := range []Protocol{
 		protoIP4,
 		protoTCP,
-		protoDNS,
-		protoDNS4,
-		protoDNS6,
-		protoDNSADDR,
 		protoUDP,
 		protoDCCP,
 		protoIP6,
 		protoIP6ZONE,
 		protoSCTP,
-		protoCIRCUIT,
 		protoONION2,
 		protoONION3,
 		protoGARLIC64,
-		protoGARLIC32,
 		protoUTP,
 		protoUDT,
 		protoQUIC,
@@ -253,11 +168,6 @@ func init() {
 		protoP2P,
 		protoUNIX,
 		protoP2P_WEBRTC_DIRECT,
-		protoTLS,
-		protoNOISE,
-		protoWS,
-		protoWSS,
-		protoPlaintextV2,
 	} {
 		if err := AddProtocol(p); err != nil {
 			panic(err)

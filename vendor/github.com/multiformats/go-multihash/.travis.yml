@@ -6,25 +6,16 @@ language: go
 go:
   - 1.11.x
 
-env:
-  global:
-    - GOTFLAGS="-race"
-  matrix:
-    - BUILD_DEPTYPE=gomod
-
-
-# disable travis install
 install:
-  - true
+  - make deps
 
 script:
   - bash <(curl -s https://raw.githubusercontent.com/ipfs/ci-helpers/master/travis-ci/run-standard-tests.sh)
-
+  - cd test && make test
 
 cache:
-  directories:
-    - $GOPATH/pkg/mod
-    - /home/travis/.cache/go-build
+    directories:
+        - $GOPATH/src/gx
 
 notifications:
   email: false

@@ -1,11 +1,10 @@
 package multihash
 
 import (
+	"encoding/binary"
 	"errors"
 	"io"
 	"math"
-
-	"github.com/multiformats/go-varint"
 )
 
 // Reader is an io.Reader wrapper that exposes a function
@@ -61,12 +60,12 @@ func (r *mhReader) ReadByte() (byte, error) {
 }
 
 func (r *mhReader) ReadMultihash() (Multihash, error) {
-	code, err := varint.ReadUvarint(r)
+	code, err := binary.ReadUvarint(r)
 	if err != nil {
 		return nil, err
 	}
 
-	length, err := varint.ReadUvarint(r)
+	length, err := binary.ReadUvarint(r)
 	if err != nil {
 		return nil, err
 	}
@@ -74,9 +73,15 @@ func (r *mhReader) ReadMultihash() (Multihash, error) {
 		return nil, errors.New("digest too long, supporting only <= 2^31-1")
 	}
 
-	buf := make([]byte, varint.UvarintSize(code)+varint.UvarintSize(length)+int(length))
-	n := varint.PutUvarint(buf, code)
-	n += varint.PutUvarint(buf[n:], length)
+	pre := make([]byte, 2*binary.MaxVarintLen64)
+	spot := pre
+	n := binary.PutUvarint(spot, code)
+	spot = pre[n:]
+	n += binary.PutUvarint(spot, length)
+
+	buf := make([]byte, int(length)+n)
+	copy(buf, pre[:n])
+
 	if _, err := io.ReadFull(r.r, buf[n:]); err != nil {
 		return nil, err
 	}

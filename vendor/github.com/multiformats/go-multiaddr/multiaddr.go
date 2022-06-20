@@ -159,10 +159,6 @@ func (m *multiaddr) Decapsulate(o Multiaddr) Multiaddr {
 		return &multiaddr{bytes: cpy}
 	}
 
-	if i == 0 {
-		return nil
-	}
-
 	ma, err := NewMultiaddr(s1[:i])
 	if err != nil {
 		panic("Multiaddr.Decapsulate incorrect byte boundaries.")
@@ -183,20 +179,4 @@ func (m *multiaddr) ValueForProtocol(code int) (value string, err error) {
 		return true
 	})
 	return
-}
-
-// FilterAddrs is a filter that removes certain addresses, according to the given filters.
-// If all filters return true, the address is kept.
-func FilterAddrs(a []Multiaddr, filters ...func(Multiaddr) bool) []Multiaddr {
-	b := make([]Multiaddr, 0, len(a))
-addrloop:
-	for _, addr := range a {
-		for _, filter := range filters {
-			if !filter(addr) {
-				continue addrloop
-			}
-		}
-		b = append(b, addr)
-	}
-	return b
 }

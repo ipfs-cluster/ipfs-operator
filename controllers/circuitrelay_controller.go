@@ -23,17 +23,20 @@ import (
 	"strings"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/json"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	"github.com/libp2p/go-libp2p-core/crypto"
 	clusterv1alpha1 "github.com/redhat-et/ipfs-operator/api/v1alpha1"
 
 	ma "github.com/multiformats/go-multiaddr"
@@ -45,6 +48,8 @@ type CircuitRelayReconciler struct {
 	Scheme *runtime.Scheme
 }
 
+//+kubebuilder:rbac:groups=*,resources=*,verbs=get;list
+//+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=cluster.ipfs.io,resources=circuitrelays,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=cluster.ipfs.io,resources=circuitrelays/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=cluster.ipfs.io,resources=circuitrelays/finalizers,verbs=update
@@ -124,9 +129,53 @@ func (r *CircuitRelayReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 	instance.Status.AnnounceAddrs = mastrings
 
+	privkey, pubkey, err := newKey()
+	if err != nil {
+		log.Error(err, "error during key generation")
+		return ctrl.Result{
+			RequeueAfter: time.Minute,
+		}, err
+	}
+	instance.Status.PeerID = pubkey.String()
 	r.Status().Update(ctx, instance)
 
-	return ctrl.Result{}, nil
+	identity, err := crypto.MarshalPrivateKey(privkey)
+	if err != nil {
+		log.Error(err, "error marshaling private key")
+		return ctrl.Result{
+			RequeueAfter: time.Minute,
+		}, err
+	}
+
+	log.Info("create or patch circuitrelay deployment with addrs", "addrs", mastrings)
+
+	sec := corev1.Secret{}
+	cm := corev1.ConfigMap{}
+	dep := appsv1.Deployment{}
+
+	mutsec := r.secretIdentity(instance, &sec, identity)
+	mutcm := r.configRelay(instance, &cm, mastrings)
+	mutdep := r.deploymentRelay(instance, &dep)
+
+	trackedObjects := map[client.Object]controllerutil.MutateFn{
+		&sec: mutsec,
+		&cm:  mutcm,
+		&dep: mutdep,
+	}
+
+	var requeue bool
+	for obj, mut := range trackedObjects {
+		kind := obj.GetObjectKind().GroupVersionKind()
+		name := obj.GetName()
+		result, err := controllerutil.CreateOrPatch(ctx, r.Client, obj, mut)
+		if err != nil {
+			log.Error(err, "error creating object", "objname", name, "objKind", kind.Kind, "result", result)
+			requeue = true
+		} else {
+			log.Info("object changed", "objName", name, "objKind", kind.Kind, "result", result)
+		}
+	}
+	return ctrl.Result{Requeue: requeue}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -135,6 +184,7 @@ func (r *CircuitRelayReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		// Uncomment the following line adding a pointer to an instance of the controlled resource as an argument
 		For(&clusterv1alpha1.CircuitRelay{}).
 		Owns(&corev1.Service{}, builder.OnlyMetadata).
+		Owns(&appsv1.Deployment{}, builder.OnlyMetadata).
 		Complete(r)
 }
 
@@ -154,7 +204,7 @@ func (r *CircuitRelayReconciler) serviceRelay(m *clusterv1alpha1.CircuitRelay, s
 					Port:       4001,
 					TargetPort: intstr.FromString("swarm"),
 				},
-				// Commented out because some load balancers don't support UDP+HTTP :(
+				// Commented out because some load balancers don't support TCP+UDP:(
 				//
 				// {
 				// 	Name:       "swarm-udp",
@@ -162,12 +212,15 @@ func (r *CircuitRelayReconciler) serviceRelay(m *clusterv1alpha1.CircuitRelay, s
 				// 	Port:       4001,
 				// 	TargetPort: intstr.FromString("swarm-udp"),
 				// },
-				{
-					Name:       "swarm-ws",
-					Protocol:   corev1.ProtocolTCP,
-					Port:       8081,
-					TargetPort: intstr.FromString("swarm-ws"),
-				},
+				//
+				// Commented out.
+				// TODO: support websockets and TLS.
+				// {
+				// 	Name:       "swarm-ws",
+				// 	Protocol:   corev1.ProtocolTCP,
+				// 	Port:       8081,
+				// 	TargetPort: intstr.FromString("swarm-ws"),
+				// },
 			},
 			Selector: map[string]string{
 				"app.kubernetes.io/name": svcName,
@@ -178,6 +231,141 @@ func (r *CircuitRelayReconciler) serviceRelay(m *clusterv1alpha1.CircuitRelay, s
 	ctrl.SetControllerReference(m, svc, r.Scheme)
 	return func() error {
 		svc.Spec = expected.Spec
+		return nil
+	}
+}
+
+func (r *CircuitRelayReconciler) secretIdentity(m *clusterv1alpha1.CircuitRelay, sec *corev1.Secret, identity []byte) controllerutil.MutateFn {
+	secName := "libp2p-relay-daemon-identity-" + m.Name
+	expected := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      secName,
+			Namespace: m.Namespace,
+		},
+		Data: map[string][]byte{
+			"identity": identity,
+		},
+	}
+	expected.DeepCopyInto(sec)
+	ctrl.SetControllerReference(m, sec, r.Scheme)
+	return func() error {
+		return nil
+	}
+}
+
+func (r *CircuitRelayReconciler) configRelay(m *clusterv1alpha1.CircuitRelay, cm *corev1.ConfigMap, announceAddrs []string) controllerutil.MutateFn {
+	cmName := "libp2p-relay-daemon-config-" + m.Name
+	cfg := map[string]interface{}{
+		"Network": map[string]interface{}{
+			"AnnounceAddrs": announceAddrs,
+		},
+	}
+	cfgbytes, _ := json.Marshal(cfg)
+	expected := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      cmName,
+			Namespace: m.Namespace,
+		},
+		BinaryData: map[string][]byte{
+			"config.json": cfgbytes,
+		},
+	}
+	expected.DeepCopyInto(cm)
+	ctrl.SetControllerReference(m, cm, r.Scheme)
+	return func() error {
+		return nil
+	}
+}
+
+func (r *CircuitRelayReconciler) deploymentRelay(m *clusterv1alpha1.CircuitRelay, dep *appsv1.Deployment) controllerutil.MutateFn {
+	depName := "libp2p-relay-daemon-" + m.Name
+	expected := appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      depName,
+			Namespace: m.Namespace,
+		},
+		Spec: appsv1.DeploymentSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"app.kubernetes.io/name": depName,
+				},
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"app.kubernetes.io/name": depName,
+					},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "relay",
+							Image: "coryschwartz/libp2p-relay-daemon:latest",
+							Args: []string{
+								"-config",
+								"/config.json",
+								"-id",
+								"/identity",
+							},
+							Ports: []corev1.ContainerPort{
+								{
+									Name:          "swarm",
+									ContainerPort: 4001,
+									Protocol:      "TCP",
+								},
+								{
+									Name:          "swarm-udp",
+									ContainerPort: 4001,
+									Protocol:      "UDP",
+								},
+								{
+									Name:          "pprof",
+									ContainerPort: 6060,
+									Protocol:      "UDP",
+								},
+							},
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "config",
+									MountPath: "/config.json",
+									SubPath:   "config.json",
+								},
+								{
+									Name:      "identity",
+									MountPath: "/identity",
+									SubPath:   "identity",
+								},
+							},
+						},
+					},
+					Volumes: []corev1.Volume{
+						{
+							Name: "config",
+							VolumeSource: corev1.VolumeSource{
+								ConfigMap: &corev1.ConfigMapVolumeSource{
+									LocalObjectReference: corev1.LocalObjectReference{
+										Name: "libp2p-relay-daemon-config-" + m.Name,
+									},
+								},
+							},
+						},
+						{
+							Name: "identity",
+							VolumeSource: corev1.VolumeSource{
+								Secret: &corev1.SecretVolumeSource{
+									SecretName: "libp2p-relay-daemon-identity-" + m.Name,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	expected.DeepCopyInto(dep)
+	ctrl.SetControllerReference(m, dep, r.Scheme)
+	return func() error {
+		dep.Spec = expected.Spec
 		return nil
 	}
 }

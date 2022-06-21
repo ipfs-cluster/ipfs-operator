@@ -36,7 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	"github.com/libp2p/go-libp2p-core/crypto"
+	crypto "github.com/libp2p/go-libp2p-crypto"
 	clusterv1alpha1 "github.com/redhat-et/ipfs-operator/api/v1alpha1"
 
 	ma "github.com/multiformats/go-multiaddr"
@@ -127,41 +127,44 @@ func (r *CircuitRelayReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	for i, maddr := range maddrs {
 		mastrings[i] = maddr.String()
 	}
-	instance.Status.AnnounceAddrs = mastrings
 
-	privkey, pubkey, err := newKey()
-	if err != nil {
-		log.Error(err, "error during key generation")
-		return ctrl.Result{
-			RequeueAfter: time.Minute,
-		}, err
-	}
-	instance.Status.PeerID = pubkey.String()
-	r.Status().Update(ctx, instance)
+	trackedObjects := make(map[client.Object]controllerutil.MutateFn)
 
-	identity, err := crypto.MarshalPrivateKey(privkey)
-	if err != nil {
-		log.Error(err, "error marshaling private key")
-		return ctrl.Result{
-			RequeueAfter: time.Minute,
-		}, err
+	// Test if we have already updated the status.
+	// And if not, then generate a new identity
+	if len(instance.Status.AnnounceAddrs) == 0 {
+		instance.Status.AnnounceAddrs = mastrings
+		privkey, pubkey, err := newKey()
+		if err != nil {
+			log.Error(err, "error during key generation")
+			return ctrl.Result{
+				RequeueAfter: time.Minute,
+			}, err
+		}
+		instance.Status.PeerID = pubkey.String()
+		r.Status().Update(ctx, instance)
+
+		identity, err := crypto.MarshalPrivateKey(privkey)
+		if err != nil {
+			log.Error(err, "error marshaling private key")
+			return ctrl.Result{
+				RequeueAfter: time.Minute,
+			}, err
+		}
+		sec := corev1.Secret{}
+		mutsec := r.secretIdentity(instance, &sec, identity)
+		trackedObjects[&sec] = mutsec
 	}
 
 	log.Info("create or patch circuitrelay deployment with addrs", "addrs", mastrings)
 
-	sec := corev1.Secret{}
 	cm := corev1.ConfigMap{}
+	mutcm := r.configRelay(instance, &cm)
+	trackedObjects[&cm] = mutcm
+
 	dep := appsv1.Deployment{}
-
-	mutsec := r.secretIdentity(instance, &sec, identity)
-	mutcm := r.configRelay(instance, &cm, mastrings)
 	mutdep := r.deploymentRelay(instance, &dep)
-
-	trackedObjects := map[client.Object]controllerutil.MutateFn{
-		&sec: mutsec,
-		&cm:  mutcm,
-		&dep: mutdep,
-	}
+	trackedObjects[&dep] = mutdep
 
 	var requeue bool
 	for obj, mut := range trackedObjects {
@@ -253,8 +256,9 @@ func (r *CircuitRelayReconciler) secretIdentity(m *clusterv1alpha1.CircuitRelay,
 	}
 }
 
-func (r *CircuitRelayReconciler) configRelay(m *clusterv1alpha1.CircuitRelay, cm *corev1.ConfigMap, announceAddrs []string) controllerutil.MutateFn {
+func (r *CircuitRelayReconciler) configRelay(m *clusterv1alpha1.CircuitRelay, cm *corev1.ConfigMap) controllerutil.MutateFn {
 	cmName := "libp2p-relay-daemon-config-" + m.Name
+	announceAddrs := m.Status.AnnounceAddrs
 	cfg := map[string]interface{}{
 		"Network": map[string]interface{}{
 			"AnnounceAddrs": announceAddrs,

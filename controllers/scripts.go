@@ -60,10 +60,15 @@ if [ -f /data/ipfs/config ]; then
 fi
 
 ipfs init --profile=badgerds,server
+MYSELF=$(ipfs id -f="<id>")
 
 ipfs config Addresses.API /ip4/0.0.0.0/tcp/5001
 ipfs config Addresses.Gateway /ip4/0.0.0.0/tcp/8080
-ipfs config --json Addresses.Announce '%s'
+ANNOUNCE=$(sed "s/REPLACEME/$MYSELF/g" <<END
+%s
+END
+)
+ipfs config --json Addresses.Announce "$ANNOUNCE"
 ipfs config --json Swarm.ConnMgr.HighWater 2000
 ipfs config --json Datastore.BloomFilterSize 1048576
 ipfs config --json Swarm.RelayClient '%s'
@@ -78,7 +83,7 @@ func (r *IpfsReconciler) configMapScripts(m *clusterv1alpha1.Ipfs, cm *corev1.Co
 	relayAddrs := m.Status.Addresses
 	announceAddresses := make([]string, len(relayAddrs))
 	for i, ra := range relayAddrs {
-		announceAddresses[i] = ra + "/p2p-circuit"
+		announceAddresses[i] = ra + "/p2p-circuit/p2p/REPLACEME"
 	}
 	relayClientConfig := map[string]interface{}{
 		"Enabled":      true,

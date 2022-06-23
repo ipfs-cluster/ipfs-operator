@@ -34,6 +34,9 @@ spec:
             type: object
           spec:
             properties:
+              circuitRelays:
+                format: int32
+                type: integer
               clusterStorage:
                 type: string
               ipfsStorage:
@@ -46,6 +49,7 @@ spec:
               url:
                 type: string
             required:
+            - circuitRelays
             - clusterStorage
             - ipfsStorage
             - public

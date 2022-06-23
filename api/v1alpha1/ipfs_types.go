@@ -37,6 +37,7 @@ type IpfsSpec struct {
 	IpfsStorage    string `json:"ipfsStorage"`
 	ClusterStorage string `json:"clusterStorage"`
 	Replicas       int32  `json:"replicas"`
+	CircuitRelays  int32  `json:"circuitRelays"`
 }
 
 type IpfsStatus struct {

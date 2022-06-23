@@ -1,8 +1,11 @@
 package controllers
 
 import (
+	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/json"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	clusterv1alpha1 "github.com/redhat-et/ipfs-operator/api/v1alpha1"
@@ -57,10 +60,13 @@ if [ -f /data/ipfs/config ]; then
 fi
 
 ipfs init --profile=badgerds,server
+
 ipfs config Addresses.API /ip4/0.0.0.0/tcp/5001
 ipfs config Addresses.Gateway /ip4/0.0.0.0/tcp/8080
+ipfs config --json Addresses.Announce '%s'
 ipfs config --json Swarm.ConnMgr.HighWater 2000
 ipfs config --json Datastore.BloomFilterSize 1048576
+ipfs config --json Swarm.RelayClient '%s'
 ipfs config Datastore.StorageMax 100GB
 
 chown -R ipfs: /data/ipfs
@@ -69,6 +75,21 @@ chown -R ipfs: /data/ipfs
 
 func (r *IpfsReconciler) configMapScripts(m *clusterv1alpha1.Ipfs, cm *corev1.ConfigMap) (controllerutil.MutateFn, string) {
 	cmName := "ipfs-cluster-scripts-" + m.Name
+	relayAddrs := m.Status.Addresses
+	announceAddresses := make([]string, len(relayAddrs))
+	for i, ra := range relayAddrs {
+		announceAddresses[i] = ra + "/p2p-circuit"
+	}
+	relayClientConfig := map[string]interface{}{
+		"Enabled":      true,
+		"StaticRelays": relayAddrs,
+	}
+
+	announceAddressesJSON, _ := json.Marshal(announceAddresses)
+	relayClientConfigJSON, _ := json.Marshal(relayClientConfig)
+
+	configureIpfsFixed := fmt.Sprintf(configureIpfs, string(announceAddressesJSON), string(relayClientConfigJSON))
+
 	expected := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cmName,
@@ -76,7 +97,7 @@ func (r *IpfsReconciler) configMapScripts(m *clusterv1alpha1.Ipfs, cm *corev1.Co
 		},
 		Data: map[string]string{
 			"entrypoint.sh":     entrypoint,
-			"configure-ipfs.sh": configureIpfs,
+			"configure-ipfs.sh": configureIpfsFixed,
 		},
 	}
 	expected.DeepCopyInto(cm)

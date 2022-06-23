@@ -19,6 +19,8 @@ package controllers
 import (
 	"context"
 	"encoding/base64"
+	"fmt"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -78,7 +80,7 @@ func (r *IpfsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		controllerutil.AddFinalizer(instance, finalizer)
 		err := r.Update(ctx, instance)
 		if err != nil {
-			return ctrl.Result{}, nil
+			return ctrl.Result{}, err
 		}
 		return ctrl.Result{Requeue: true}, nil
 	}
@@ -91,19 +93,58 @@ func (r *IpfsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	priv, peerid, err := newKey()
 	if err != nil {
 		log.Error(err, "cannot generate new key")
-		return ctrl.Result{}, nil
+		return ctrl.Result{}, err
 	}
 	privBytes, err := priv.Bytes()
 	if err != nil {
 		log.Error(err, "cannot get bytes from private key")
-		return ctrl.Result{}, nil
+		return ctrl.Result{}, err
 	}
 	privStr := base64.StdEncoding.EncodeToString(privBytes)
 
 	clusSec, err := newClusterSecret()
 	if err != nil {
 		log.Error(err, "cannot generate new cluster secret")
-		return ctrl.Result{}, nil
+		return ctrl.Result{}, err
+	}
+
+	// Create circuit relays, if necessary.
+	if len(instance.Status.CircuitRelays) == 0 {
+		var relayNames []string
+		for i := 0; int32(i) < instance.Spec.CircuitRelays; i++ {
+			name := fmt.Sprintf("%s-%d", instance.Name, i)
+			relayNames = append(relayNames, name)
+			relay := clusterv1alpha1.CircuitRelay{}
+			relay.Name = name
+			relay.Namespace = instance.Namespace
+			ctrl.SetControllerReference(instance, &relay, r.Scheme)
+			r.Create(ctx, &relay)
+			instance.Status.CircuitRelays = append(instance.Status.CircuitRelays, relay.Name)
+		}
+		r.Status().Update(ctx, instance)
+	}
+
+	// Check the status of circuit relays.
+	// wait for them to complte so we can determine announce addresses.
+	if len(instance.Status.Addresses) == 0 {
+		for _, relayName := range instance.Status.CircuitRelays {
+			relay := clusterv1alpha1.CircuitRelay{}
+			relay.Name = relayName
+			relay.Namespace = instance.Namespace
+			err := r.Get(ctx, client.ObjectKeyFromObject(&relay), &relay)
+			if err != nil {
+				log.Error(err, "could not lookup circuitRelay", "relay", relayName)
+				return ctrl.Result{Requeue: true}, err
+			}
+			if len(relay.Status.AnnounceAddrs) == 0 || relay.Status.PeerID == "" {
+				log.Info("relay is not ready yet. Will continue waiting.", "relay", relayName)
+				return ctrl.Result{RequeueAfter: time.Minute}, nil
+			}
+			for _, addr := range relay.Status.AnnounceAddrs {
+				instance.Status.Addresses = append(instance.Status.Addresses, fmt.Sprintf("%s/p2p/%s", addr, relay.Status.PeerID))
+			}
+		}
+		r.Status().Update(ctx, instance)
 	}
 
 	sa := corev1.ServiceAccount{}
@@ -153,6 +194,7 @@ func (r *IpfsReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.ServiceAccount{}, builder.OnlyMetadata).
 		Owns(&corev1.Secret{}, builder.OnlyMetadata).
 		Owns(&corev1.ConfigMap{}, builder.OnlyMetadata).
+		Owns(&clusterv1alpha1.Ipfs{}, builder.OnlyMetadata).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: 1,
 		}).Complete(r)

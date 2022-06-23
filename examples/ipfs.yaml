@@ -8,3 +8,4 @@ spec:
   clusterStorage: 20Gi
   public: true
   replicas: 2
+  circuitRelays: 1

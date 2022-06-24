@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"fmt"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -72,6 +73,8 @@ ipfs config --json Addresses.Announce "$ANNOUNCE"
 ipfs config --json Swarm.ConnMgr.HighWater 2000
 ipfs config --json Datastore.BloomFilterSize 1048576
 ipfs config --json Swarm.RelayClient '%s'
+ipfs config --jsoin Swarm.EnableHolePunching true
+ipfs config --json Peering.Peers '%s'
 ipfs config Datastore.StorageMax 100GB
 
 chown -R ipfs: /data/ipfs
@@ -82,8 +85,16 @@ func (r *IpfsReconciler) configMapScripts(m *clusterv1alpha1.Ipfs, cm *corev1.Co
 	cmName := "ipfs-cluster-scripts-" + m.Name
 	relayAddrs := m.Status.Addresses
 	announceAddresses := make([]string, len(relayAddrs))
+	peeringConfig := make([]map[string]interface{}, len(relayAddrs))
 	for i, ra := range relayAddrs {
 		announceAddresses[i] = ra + "/p2p-circuit/p2p/REPLACEME"
+		rasplit := strings.Split(ra, "/")
+		idpart := rasplit[len(rasplit)-1]
+		addrpart := strings.Join(rasplit[:len(rasplit)-2], "/")
+		peeringConfig[i] = map[string]interface{}{
+			"ID":    idpart,
+			"Addrs": []string{addrpart},
+		}
 	}
 	relayClientConfig := map[string]interface{}{
 		"Enabled":      true,
@@ -92,8 +103,9 @@ func (r *IpfsReconciler) configMapScripts(m *clusterv1alpha1.Ipfs, cm *corev1.Co
 
 	announceAddressesJSON, _ := json.Marshal(announceAddresses)
 	relayClientConfigJSON, _ := json.Marshal(relayClientConfig)
+	peeringConfigJSON, _ := json.Marshal(peeringConfig)
 
-	configureIpfsFixed := fmt.Sprintf(configureIpfs, string(announceAddressesJSON), string(relayClientConfigJSON))
+	configureIpfsFixed := fmt.Sprintf(configureIpfs, string(announceAddressesJSON), string(relayClientConfigJSON), string(peeringConfigJSON))
 
 	expected := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{

@@ -17,15 +17,65 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"github.com/libp2p/go-libp2p-core/peer"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	ma "github.com/multiformats/go-multiaddr"
 )
+
+// This is intended to mimic peer.AddrInfo
+type AddrInfoBasicType struct {
+	ID       string        `json:"id"`
+	Addrs    []string      `json:"addrs"`
+	addrInfo peer.AddrInfo `json:"-"`
+}
+
+func (a *AddrInfoBasicType) Parse() error {
+	id, err := peer.IDB58Decode(a.ID)
+	if err != nil {
+		return err
+	}
+	addrs := make([]ma.Multiaddr, len(a.Addrs))
+	for i, addr := range a.Addrs {
+		maddr, err := ma.NewMultiaddr(addr)
+		if err != nil {
+			return err
+		}
+		addrs[i] = maddr
+	}
+	ai := peer.AddrInfo{
+		ID:    id,
+		Addrs: addrs,
+	}
+	a.addrInfo = ai
+	return nil
+}
+
+func (a *AddrInfoBasicType) AddrInfo() *peer.AddrInfo {
+	return &a.addrInfo
+}
+
+func (a *AddrInfoBasicType) DeepCopyInto(out *AddrInfoBasicType) {
+	out = new(AddrInfoBasicType)
+	addrs := make([]string, len(a.Addrs))
+	for i, addr := range a.Addrs {
+		addrs[i] = addr
+	}
+	out.ID = a.ID
+	out.Addrs = addrs
+}
+
+func (a *AddrInfoBasicType) DeepCopy() *AddrInfoBasicType {
+	var out *AddrInfoBasicType
+	a.DeepCopyInto(out)
+	return out
+}
 
 type CircuitRelaySpec struct {
 }
 
 type CircuitRelayStatus struct {
-	PeerID        string   `json:"peerid"`
-	AnnounceAddrs []string `json:"announceaddrs"`
+	AddrInfo AddrInfoBasicType `json:"addrInfo"`
 }
 
 //+kubebuilder:object:root=true

@@ -58,10 +58,6 @@ spec:
             type: object
           status:
             properties:
-              addresses:
-                items:
-                  type: string
-                type: array
               circuitRelays:
                 items:
                   type: string

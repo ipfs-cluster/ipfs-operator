@@ -1,16 +1,21 @@
 package controllers
 
 import (
+	"context"
+	encjson "encoding/json"
 	"fmt"
-	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/json"
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	"github.com/libp2p/go-libp2p-core/peer"
+	ma "github.com/multiformats/go-multiaddr"
 	clusterv1alpha1 "github.com/redhat-et/ipfs-operator/api/v1alpha1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var (
@@ -76,26 +81,43 @@ chown -R ipfs: /data/ipfs
 `
 )
 
-func (r *IpfsReconciler) configMapScripts(m *clusterv1alpha1.Ipfs, cm *corev1.ConfigMap) (controllerutil.MutateFn, string) {
-	cmName := "ipfs-cluster-scripts-" + m.Name
-	relayAddrs := m.Status.Addresses
-	peeringConfig := make([]map[string]interface{}, len(relayAddrs))
-	for i, ra := range relayAddrs {
-		rasplit := strings.Split(ra, "/")
-		idpart := rasplit[len(rasplit)-1]
-		addrpart := strings.Join(rasplit[:len(rasplit)-2], "/")
-		peeringConfig[i] = map[string]interface{}{
-			"ID":    idpart,
-			"Addrs": []string{addrpart},
+func (r *IpfsReconciler) configMapScripts(ctx context.Context, m *clusterv1alpha1.Ipfs, cm *corev1.ConfigMap) (controllerutil.MutateFn, string) {
+	log := ctrllog.FromContext(ctx)
+	relayPeers := []*peer.AddrInfo{}
+	relayStatic := []*ma.Multiaddr{}
+	for _, relayName := range m.Status.CircuitRelays {
+		relay := clusterv1alpha1.CircuitRelay{}
+		relay.Name = relayName
+		relay.Namespace = m.Namespace
+		err := r.Get(ctx, client.ObjectKeyFromObject(&relay), &relay)
+		if err != nil {
+			log.Error(err, "could not lookup circuitRelay during confgMapScripts", "relay", relayName)
+			return nil, ""
+		}
+		if err := relay.Status.AddrInfo.Parse(); err != nil {
+			log.Error(err, "could not parse AddrInfo. Information will not be included in config", "relay", relayName)
+			continue
+		}
+		ai := relay.Status.AddrInfo.AddrInfo()
+		relayPeers = append(relayPeers, ai)
+		p2ppart, err := ma.NewMultiaddr("/p2p/" + ai.ID.String())
+		if err != nil {
+			log.Error(err, "could not create p2p component during configMapScripts", "relay", relayName)
+		}
+		for _, addr := range ai.Addrs {
+			fullMa := addr.Encapsulate(p2ppart)
+			relayStatic = append(relayStatic, &fullMa)
 		}
 	}
+
+	cmName := "ipfs-cluster-scripts-" + m.Name
 	relayClientConfig := map[string]interface{}{
 		"Enabled":      true,
-		"StaticRelays": relayAddrs,
+		"StaticRelays": relayStatic,
 	}
 
 	relayClientConfigJSON, _ := json.Marshal(relayClientConfig)
-	peeringConfigJSON, _ := json.Marshal(peeringConfig)
+	peeringConfigJSON, _ := encjson.Marshal(relayPeers)
 
 	configureIpfsFixed := fmt.Sprintf(configureIpfs, string(relayClientConfigJSON), string(peeringConfigJSON))
 

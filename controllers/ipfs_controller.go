@@ -128,26 +128,21 @@ func (r *IpfsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 
 	// Check the status of circuit relays.
 	// wait for them to complte so we can determine announce addresses.
-	if len(instance.Status.Addresses) == 0 {
-		for _, relayName := range instance.Status.CircuitRelays {
-			relay := clusterv1alpha1.CircuitRelay{}
-			relay.Name = relayName
-			relay.Namespace = instance.Namespace
-			err := r.Get(ctx, client.ObjectKeyFromObject(&relay), &relay)
-			if err != nil {
-				log.Error(err, "could not lookup circuitRelay", "relay", relayName)
-				return ctrl.Result{Requeue: true}, err
-			}
-			if len(relay.Status.AnnounceAddrs) == 0 || relay.Status.PeerID == "" {
-				log.Info("relay is not ready yet. Will continue waiting.", "relay", relayName)
-				return ctrl.Result{RequeueAfter: time.Minute}, nil
-			}
-			for _, addr := range relay.Status.AnnounceAddrs {
-				instance.Status.Addresses = append(instance.Status.Addresses, fmt.Sprintf("%s/p2p/%s", addr, relay.Status.PeerID))
-			}
+	for _, relayName := range instance.Status.CircuitRelays {
+		relay := clusterv1alpha1.CircuitRelay{}
+		relay.Name = relayName
+		relay.Namespace = instance.Namespace
+		err := r.Client.Get(ctx, client.ObjectKeyFromObject(&relay), &relay)
+		if err != nil {
+			log.Error(err, "could not lookup circuitRelay", "relay", relayName)
+			return ctrl.Result{Requeue: true}, err
 		}
-		r.Status().Update(ctx, instance)
+		if relay.Status.AddrInfo.ID == "" {
+			log.Info("relay is not ready yet. Will continue waiting.", "relay", relayName)
+			return ctrl.Result{RequeueAfter: time.Minute}, nil
+		}
 	}
+	r.Status().Update(ctx, instance)
 
 	sa := corev1.ServiceAccount{}
 	svc := corev1.Service{}
@@ -158,7 +153,7 @@ func (r *IpfsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 
 	mutsa := r.serviceAccount(instance, &sa)
 	mutsvc, svcName := r.serviceCluster(instance, &svc)
-	mutCmScripts, cmScriptName := r.configMapScripts(instance, &cmScripts)
+	mutCmScripts, cmScriptName := r.configMapScripts(ctx, instance, &cmScripts)
 	mutCmConfig, cmConfigName := r.configMapConfig(instance, &cmConfig, peerid.String())
 	mutSecConfig, secConfigName := r.secretConfig(instance, &secConfig, []byte(clusSec), []byte(privStr))
 	mutSts := r.statefulSet(instance, &sts, svcName, secConfigName, cmConfigName, cmScriptName)

@@ -42,7 +42,6 @@ type IpfsSpec struct {
 
 type IpfsStatus struct {
 	Conditions    []metav1.Condition `json:"conditions,omitempty"`
-	Addresses     []string           `json:"addresses,omitempty"`
 	CircuitRelays []string           `json:"circuitRelays,omitempty"`
 }
 

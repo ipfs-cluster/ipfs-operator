@@ -36,15 +36,21 @@ spec:
             type: object
           status:
             properties:
-              announceaddrs:
-                items:
-                  type: string
-                type: array
-              peerid:
-                type: string
+              addrInfo:
+                description: This is intended to mimic peer.AddrInfo
+                properties:
+                  addrs:
+                    items:
+                      type: string
+                    type: array
+                  id:
+                    type: string
+                required:
+                - addrs
+                - id
+                type: object
             required:
-            - announceaddrs
-            - peerid
+            - addrInfo
             type: object
         type: object
     served: true

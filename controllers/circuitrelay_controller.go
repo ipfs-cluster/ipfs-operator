@@ -123,17 +123,17 @@ func (r *CircuitRelayReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}
 	}
 
-	mastrings := make([]string, len(maddrs))
-	for i, maddr := range maddrs {
-		mastrings[i] = maddr.String()
-	}
-
 	trackedObjects := make(map[client.Object]controllerutil.MutateFn)
 
 	// Test if we have already updated the status.
 	// And if not, then generate a new identity
-	if len(instance.Status.AnnounceAddrs) == 0 {
-		instance.Status.AnnounceAddrs = mastrings
+	if instance.Status.AddrInfo.ID == "" {
+
+		addrStrings := make([]string, len(maddrs))
+		for i, addr := range maddrs {
+			addrStrings[i] = addr.String()
+		}
+		instance.Status.AddrInfo.Addrs = addrStrings
 		privkey, pubkey, err := newKey()
 		if err != nil {
 			log.Error(err, "error during key generation")
@@ -141,7 +141,7 @@ func (r *CircuitRelayReconciler) Reconcile(ctx context.Context, req ctrl.Request
 				RequeueAfter: time.Minute,
 			}, err
 		}
-		instance.Status.PeerID = pubkey.String()
+		instance.Status.AddrInfo.ID = pubkey.String()
 		r.Status().Update(ctx, instance)
 
 		identity, err := crypto.MarshalPrivateKey(privkey)
@@ -156,7 +156,14 @@ func (r *CircuitRelayReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		trackedObjects[&sec] = mutsec
 	}
 
-	log.Info("create or patch circuitrelay deployment with addrs", "addrs", mastrings)
+	if err := instance.Status.AddrInfo.Parse(); err != nil {
+		log.Error(err, "cannot parse AddrInfo for relay.")
+		return ctrl.Result{
+			Requeue: true,
+		}, err
+	}
+
+	log.Info("create or patch circuitrelay deployment with addrs", "addrs", maddrs)
 
 	cm := corev1.ConfigMap{}
 	mutcm := r.configRelay(instance, &cm)
@@ -258,7 +265,8 @@ func (r *CircuitRelayReconciler) secretIdentity(m *clusterv1alpha1.CircuitRelay,
 
 func (r *CircuitRelayReconciler) configRelay(m *clusterv1alpha1.CircuitRelay, cm *corev1.ConfigMap) controllerutil.MutateFn {
 	cmName := "libp2p-relay-daemon-config-" + m.Name
-	announceAddrs := m.Status.AnnounceAddrs
+	m.Status.AddrInfo.Parse()
+	announceAddrs := m.Status.AddrInfo.Addrs
 	cfg := map[string]interface{}{
 		"Network": map[string]interface{}{
 			"AnnounceAddrs": announceAddrs,

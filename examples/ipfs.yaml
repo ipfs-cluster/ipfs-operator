@@ -1,11 +1,12 @@
 apiVersion: cluster.ipfs.io/v1alpha1
 kind: Ipfs
 metadata:
-  name: ipfs-sample-0
+  name: ipfs-sample
 spec:
   url: apps.jephilli-4-11-04-28-0655.devcluster.openshift.com 
   ipfsStorage: 50Gi
   clusterStorage: 5Gi
   public: true
   replicas: 3
-  circuitRelays: 1
+  networking:
+    circuitRelays: 2

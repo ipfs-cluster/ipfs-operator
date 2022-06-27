@@ -31,13 +31,17 @@ const (
 	ReconciledReasonError string = "ReconcileError"
 )
 
+type networkConfig struct {
+	CircuitRelays int32 `json:"circuitRelays"`
+}
+
 type IpfsSpec struct {
-	URL            string `json:"url"`
-	Public         bool   `json:"public"`
-	IpfsStorage    string `json:"ipfsStorage"`
-	ClusterStorage string `json:"clusterStorage"`
-	Replicas       int32  `json:"replicas"`
-	CircuitRelays  int32  `json:"circuitRelays"`
+	URL            string        `json:"url"`
+	Public         bool          `json:"public"`
+	IpfsStorage    string        `json:"ipfsStorage"`
+	ClusterStorage string        `json:"clusterStorage"`
+	Replicas       int32         `json:"replicas"`
+	Networking     networkConfig `json:"networking"`
 }
 
 type IpfsStatus struct {

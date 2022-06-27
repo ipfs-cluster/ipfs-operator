@@ -111,9 +111,9 @@ func (r *IpfsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	// Create circuit relays, if necessary.
 	// TODO: if we change the number of CircuitRelays, we should update
 	// the IPFS config file as well.
-	if len(instance.Status.CircuitRelays) < int(instance.Spec.CircuitRelays) {
+	if len(instance.Status.CircuitRelays) < int(instance.Spec.Networking.CircuitRelays) {
 		var relayNames []string
-		for i := 0; int32(i) < instance.Spec.CircuitRelays; i++ {
+		for i := 0; int32(i) < instance.Spec.Networking.CircuitRelays; i++ {
 			name := fmt.Sprintf("%s-%d", instance.Name, i)
 			relayNames = append(relayNames, name)
 			relay := clusterv1alpha1.CircuitRelay{}

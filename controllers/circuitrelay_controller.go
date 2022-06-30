@@ -116,7 +116,6 @@ func (r *CircuitRelayReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		for j, port := range svc.Spec.Ports {
 			p := strings.ToLower(string(port.Protocol))
 			mastr := fmt.Sprintf("/%s/%s/%s/%d", iptype, address, p, port.Port)
-			log.Info("Trying this....", "mastr", mastr)
 			maddr, err := ma.NewMultiaddr(mastr)
 			if err != nil {
 				log.Error(err, "cannot parse multiaddr", "ip", addr.IP)

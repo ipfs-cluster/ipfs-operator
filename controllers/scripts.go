@@ -80,7 +80,7 @@ func (r *IpfsReconciler) configMapScripts(m *clusterv1alpha1.Ipfs, cm *corev1.Co
 	cmName := "ipfs-cluster-scripts-" + m.Name
 	configureTmpl, _ := tmpl.New("configureIpfs").Parse(configureIpfs)
 	var storageMaxGB string
-	parsed, err := resource.ParseQuantity(m.Spec.ClusterStorage)
+	parsed, err := resource.ParseQuantity(m.Spec.IpfsStorage)
 	if err != nil {
 		storageMaxGB = "100"
 	} else {

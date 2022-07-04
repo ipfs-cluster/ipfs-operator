@@ -255,6 +255,30 @@ func (r *IpfsReconciler) statefulSet(m *clusterv1alpha1.Ipfs,
 			ServiceName: serviceName,
 		},
 	}
+
+	// Add a follower container for each follow.
+	for _, follow := range m.Spec.Follows {
+		container := corev1.Container{
+			Name:            "ipfs-cluster-follow-" + follow.Name,
+			Image:           "ipfs/ipfs-cluster:v1.0.1",
+			ImagePullPolicy: corev1.PullIfNotPresent,
+			Command: []string{
+				"ipfs-cluster-follow",
+				follow.Name,
+				"run",
+				"--init",
+				follow.Template,
+			},
+			VolumeMounts: []corev1.VolumeMount{
+				{
+					Name:      "cluster-storage",
+					MountPath: "/data/ipfs-cluster",
+				},
+			},
+		}
+		expected.Spec.Template.Spec.Containers = append(expected.Spec.Template.Spec.Containers, container)
+	}
+
 	expected.DeepCopyInto(sts)
 	ctrl.SetControllerReference(m, sts, r.Scheme)
 	return func() error {

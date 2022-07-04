@@ -36,6 +36,18 @@ spec:
             properties:
               clusterStorage:
                 type: string
+              follows:
+                items:
+                  properties:
+                    name:
+                      type: string
+                    template:
+                      type: string
+                  required:
+                  - name
+                  - template
+                  type: object
+                type: array
               ipfsStorage:
                 type: string
               public:
@@ -47,6 +59,7 @@ spec:
                 type: string
             required:
             - clusterStorage
+            - follows
             - ipfsStorage
             - public
             - replicas

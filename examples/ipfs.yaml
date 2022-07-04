@@ -1,10 +1,37 @@
+---
 apiVersion: cluster.ipfs.io/v1alpha1
 kind: Ipfs
 metadata:
-  name: ipfs-sample-0
+  name: ipfs-sample
 spec:
   url: apps.jephilli-4-11-04-28-0655.devcluster.openshift.com 
   ipfsStorage: 20Gi
   clusterStorage: 20Gi
   public: true
   replicas: 2
+  follows: []
+
+---
+apiVersion: cluster.ipfs.io/v1alpha1
+kind: Ipfs
+metadata:
+  name: ipfs-sample-collab
+spec:
+  url: apps.jephilli-4-11-04-28-0655.devcluster.openshift.com 
+  ipfsStorage: 5Ti
+  clusterStorage: 20Gi
+  public: true
+  replicas: 5
+  follows:
+    - name: filecoin
+      template: filecoin.collab.ipfscluster.io
+    - name: gutenberg-es
+      template: gutenberg-es.collab.ipfscluster.io
+    - name: ipfs-websites
+      template: ipfs-websites.collab.ipfscluster.io
+    - name: pacman-store
+      template: cluster.pkg.pacman.store
+    - name: ravencoin
+      template: ipfs-collab.ravencoin.network
+    - name: wikipedia
+      template: wikipedia.collab.ipfscluster.io

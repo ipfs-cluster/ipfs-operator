@@ -270,7 +270,6 @@ func (r *CircuitRelayReconciler) secretIdentity(m *clusterv1alpha1.CircuitRelay,
 
 func (r *CircuitRelayReconciler) configRelay(m *clusterv1alpha1.CircuitRelay, cm *corev1.ConfigMap) controllerutil.MutateFn {
 	cmName := "libp2p-relay-daemon-config-" + m.Name
-	m.Status.AddrInfo.Parse()
 	announceAddrs := m.Status.AddrInfo.Addrs
 	cfg := map[string]interface{}{
 		"Network": map[string]interface{}{

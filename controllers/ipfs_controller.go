@@ -119,8 +119,14 @@ func (r *IpfsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 			relay := clusterv1alpha1.CircuitRelay{}
 			relay.Name = name
 			relay.Namespace = instance.Namespace
-			ctrl.SetControllerReference(instance, &relay, r.Scheme)
-			r.Create(ctx, &relay)
+			if err := ctrl.SetControllerReference(instance, &relay, r.Scheme); err != nil {
+				log.Error(err, "cannot set controller reference for new circuitRelay", "circuitRelay", relay.Name)
+				return ctrl.Result{}, err
+			}
+			if err := r.Create(ctx, &relay); err != nil {
+				log.Error(err, "cannot create new circuitRelay", "circuitRelay", relay.Name)
+				return ctrl.Result{}, err
+			}
 			instance.Status.CircuitRelays = append(instance.Status.CircuitRelays, relay.Name)
 		}
 		r.Status().Update(ctx, instance)

@@ -23,3 +23,9 @@ testbin/*
 *.swp
 *.swo
 *~
+
+# kubeconfig generated during test-e2e
+test-e2e/kubeconfig
+
+# don't include vendor/
+vendor/*

@@ -13,4 +13,6 @@ spec:
   clusterStorage: 2Gi
   public: false
   replicas: 2
+  networking:
+    circuitRelays: 0
 EOF

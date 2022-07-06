@@ -31,17 +31,22 @@ const (
 	ReconciledReasonError string = "ReconcileError"
 )
 
+type networkConfig struct {
+	CircuitRelays int32 `json:"circuitRelays"`
+}
+
 type IpfsSpec struct {
-	URL            string `json:"url"`
-	Public         bool   `json:"public"`
-	IpfsStorage    string `json:"ipfsStorage"`
-	ClusterStorage string `json:"clusterStorage"`
-	Replicas       int32  `json:"replicas"`
+	URL            string        `json:"url"`
+	Public         bool          `json:"public"`
+	IpfsStorage    string        `json:"ipfsStorage"`
+	ClusterStorage string        `json:"clusterStorage"`
+	Replicas       int32         `json:"replicas"`
+	Networking     networkConfig `json:"networking"`
 }
 
 type IpfsStatus struct {
-	Conditions []metav1.Condition `json:"conditions,omitempty"`
-	Addresses  []string           `json:"addresses,omitempty"`
+	Conditions    []metav1.Condition `json:"conditions,omitempty"`
+	CircuitRelays []string           `json:"circuitRelays,omitempty"`
 }
 
 //+kubebuilder:object:root=true

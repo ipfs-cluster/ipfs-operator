@@ -1,14 +1,11 @@
 package controllers
 
 import (
-	"bytes"
 	"context"
 	encjson "encoding/json"
-	"strconv"
-	tmpl "text/template"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/json"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -20,12 +17,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 )
-
-type configureIpfsOpts struct {
-	StorageMax      string
-	RelayClientJSON string
-	PeersJSON       string
-}
 
 var (
 	entrypoint = `
@@ -81,10 +72,9 @@ ipfs config Addresses.API /ip4/0.0.0.0/tcp/5001
 ipfs config Addresses.Gateway /ip4/0.0.0.0/tcp/8080
 ipfs config --json Swarm.ConnMgr.HighWater 2000
 ipfs config --json Datastore.BloomFilterSize 1048576
-ipfs config Datastore.StorageMax {{ .StorageMax }}GB
-ipfs config --json Swarm.RelayClient '{{ .RelayClientJSON }}'
+ipfs config --json Swarm.RelayClient '%s'
 ipfs config --json Swarm.EnableHolePunching true
-ipfs config --json Peering.Peers '{{ .PeersJSON }}'
+ipfs config --json Peering.Peers '%s'
 ipfs config Datastore.StorageMax 100GB
 
 chown -R ipfs: /data/ipfs
@@ -121,38 +111,15 @@ func (r *IpfsReconciler) configMapScripts(ctx context.Context, m *clusterv1alpha
 	}
 
 	cmName := "ipfs-cluster-scripts-" + m.Name
-	configureTmpl, _ := tmpl.New("configureIpfs").Parse(configureIpfs)
-	var storageMaxGB string
-	parsed, err := resource.ParseQuantity(m.Spec.IpfsStorage)
-	if err != nil {
-		storageMaxGB = "100"
-	} else {
-		sizei64, _ := parsed.AsInt64()
-		sizeGB := sizei64 / 1024 / 1024 / 1024
-		var reducedSize int64
-		// if the disk is big, use a bigger percentage of it.
-		if sizeGB > 1024*8 {
-			reducedSize = sizeGB * 9 / 10
-		} else {
-			reducedSize = sizeGB * 8 / 10
-		}
-		storageMaxGB = strconv.Itoa(int(reducedSize))
-	}
-
 	relayClientConfig := map[string]interface{}{
 		"Enabled":      true,
 		"StaticRelays": relayStatic,
 	}
+
 	relayClientConfigJSON, _ := json.Marshal(relayClientConfig)
 	peeringConfigJSON, _ := encjson.Marshal(relayPeers)
 
-	configureOpts := configureIpfsOpts{
-		StorageMax:      storageMaxGB,
-		PeersJSON:       string(peeringConfigJSON),
-		RelayClientJSON: string(relayClientConfigJSON),
-	}
-	configureBuf := new(bytes.Buffer)
-	configureTmpl.Execute(configureBuf, configureOpts)
+	configureIpfsFixed := fmt.Sprintf(configureIpfs, string(relayClientConfigJSON), string(peeringConfigJSON))
 
 	expected := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -161,7 +128,7 @@ func (r *IpfsReconciler) configMapScripts(ctx context.Context, m *clusterv1alpha
 		},
 		Data: map[string]string{
 			"entrypoint.sh":     entrypoint,
-			"configure-ipfs.sh": configureBuf.String(),
+			"configure-ipfs.sh": configureIpfsFixed,
 		},
 	}
 	expected.DeepCopyInto(cm)

@@ -1,0 +1,4 @@
+# This helm chart has no configurable options at the moment.
+# This will change in the future.
+#
+# To re-generate this helm chart, run `make helm-template`

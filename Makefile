@@ -102,7 +102,6 @@ help: ## Display this help.
 .PHONY: manifests
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
-	cp config/crd/bases/* helm/ipfs-operator/crds
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
@@ -115,6 +114,11 @@ lint: golangci-lint
 .PHONY: helm-lint
 helm-lint: helm
 	cd helm && $(HELM) lint ipfs-operator
+
+.PHONY: helm-template
+helm-template: manifests kustomize
+	cp config/crd/bases/* helm/ipfs-operator/crds
+	kustomize build config/default -o helm/ipfs-operator/templates/default-gen.yaml
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.

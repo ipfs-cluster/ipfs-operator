@@ -30,6 +30,7 @@ func (r *IpfsReconciler) statefulSet(m *clusterv1alpha1.Ipfs,
 	// many block storage providers have a maximum block storage of 16TB, so in this case, the
 	// biggest node we would allocate would request a minimum allocation of 16G of RAM and 12 cores
 	// and would permit usage up to twice this size
+
 	if err != nil {
 		ipfsResources = corev1.ResourceRequirements{}
 	} else {

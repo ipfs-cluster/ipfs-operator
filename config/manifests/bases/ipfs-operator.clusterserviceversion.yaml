@@ -10,6 +10,11 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
+    - description: CircuitRelay is the Schema for the circuitrelays API
+      displayName: Circuit Relay
+      kind: CircuitRelay
+      name: circuitrelays.cluster.ipfs.io
+      version: v1alpha1
     - description: Ipfs is the Schema for the ipfs API
       displayName: Ipfs
       kind: Ipfs

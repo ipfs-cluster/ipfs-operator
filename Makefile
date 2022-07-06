@@ -1,4 +1,10 @@
+GOLANGCI_VERSION := v1.46.1
+HELM_VERSION := v3.8.2
 KUTTL_VERSION := 0.10.0
+
+
+OS := $(shell go env GOOS)
+ARCH := $(shell go env GOARCH)
 
 # VERSION defines the project version for the bundle.
 # Update this value when you upgrade the version of your project.
@@ -96,10 +102,19 @@ help: ## Display this help.
 .PHONY: manifests
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+	cp config/crd/bases/* helm/ipfs-operator/crds
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
+
+.PHONY: lint
+lint: golangci-lint
+	$(GOLANGCILINT) run ./...
+
+.PHONY: helm-lint
+helm-lint: helm
+	cd helm && $(HELM) lint ipfs-operator
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
@@ -110,7 +125,7 @@ vet: ## Run go vet against code.
 	go vet ./...
 
 .PHONY: test
-test: manifests generate fmt vet envtest ## Run tests.
+test: manifests generate fmt vet lint helm-lint envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test ./... -coverprofile cover.out
 
 .PHONY: test-e2e
@@ -183,7 +198,25 @@ $(KUSTOMIZE): $(LOCALBIN)
 	GOBIN=$(LOCALBIN) go install sigs.k8s.io/kustomize/kustomize/$(KUSTOMIZE_MAJOR)@$(KUSTOMIZE_VERSION)
 	@ echo "✅ Done"
 
-# install envtest to local bin directory
+.PHONY: helm
+HELM := $(LOCALBIN)/helm
+HELM_URL := https://get.helm.sh/helm-$(HELM_VERSION)-$(OS)-$(ARCH).tar.gz
+helm: $(HELM)
+$(HELM): $(LOCALBIN)
+	@ echo "📥 Downloading helm"
+	curl -sSL "$(HELM_URL)" | tar xzf - -C $(LOCALBIN) --strip-components=1 --wildcards '*/helm'
+	@ echo "✅ Done"
+
+
+.PHONY: golangci-lint
+GOLANGCILINT := $(LOCALBIN)/golangci-lint
+GOLANGCI_URL := https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh
+golangci-lint: $(GOLANGCILINT) ## Download golangci-lint
+$(GOLANGCILINT): $(LOCALBIN)
+	@ echo "📥 Downloading helm"
+	curl -sSfL $(GOLANGCI_URL) | sh -s -- -b $(LOCALBIN) $(GOLANGCI_VERSION)
+	@ echo "✅ Done"
+
 .PHONY: envtest
 ENVTEST = $(LOCALBIN)/setup-envtest
 envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.

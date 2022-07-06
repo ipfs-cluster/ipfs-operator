@@ -29,7 +29,7 @@ user=ipfs
 
 
 if [ ! -f /data/ipfs-cluster/service.json ]; then
-	ipfs-cluster-service init
+	ipfs-cluster-service init --consensus crdt
 fi
 
 PEER_HOSTNAME=$(cat /proc/sys/kernel/hostname)

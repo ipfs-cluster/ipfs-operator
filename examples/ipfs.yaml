@@ -1,3 +1,4 @@
+---
 apiVersion: cluster.ipfs.io/v1alpha1
 kind: Ipfs
 metadata:
@@ -7,6 +8,7 @@ spec:
   ipfsStorage: 50Gi
   clusterStorage: 5Gi
   public: true
-  replicas: 3
+  replicas: 2
+  follows: []
   networking:
     circuitRelays: 2

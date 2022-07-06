@@ -31,17 +31,23 @@ const (
 	ReconciledReasonError string = "ReconcileError"
 )
 
+type followParams struct {
+	Name     string `json:"name"`
+	Template string `json:"template"`
+}
+
 type networkConfig struct {
 	CircuitRelays int32 `json:"circuitRelays"`
 }
 
 type IpfsSpec struct {
-	URL            string        `json:"url"`
-	Public         bool          `json:"public"`
-	IpfsStorage    string        `json:"ipfsStorage"`
-	ClusterStorage string        `json:"clusterStorage"`
-	Replicas       int32         `json:"replicas"`
-	Networking     networkConfig `json:"networking"`
+	URL            string         `json:"url"`
+	Public         bool           `json:"public"`
+	IpfsStorage    string         `json:"ipfsStorage"`
+	ClusterStorage string         `json:"clusterStorage"`
+	Replicas       int32          `json:"replicas"`
+	Networking     networkConfig  `json:"networking"`
+	Follows        []followParams `json:"follows"`
 }
 
 type IpfsStatus struct {

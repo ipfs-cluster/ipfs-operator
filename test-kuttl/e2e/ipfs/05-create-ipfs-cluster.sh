@@ -13,5 +13,5 @@ spec:
   clusterStorage: 2Gi
   public: false
   replicas: 2
-	follows: []
+  follows: []
 EOF

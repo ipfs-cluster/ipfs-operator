@@ -1,6 +1,9 @@
 package controllers
 
 import (
+	"regexp"
+	"strings"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -10,6 +13,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	clusterv1alpha1 "github.com/redhat-et/ipfs-operator/api/v1alpha1"
+)
+
+var (
+	// objects need to be RFC-1123 compliant, and k8s uses this regex to test.
+	// https://github.com/kubernetes/apimachinery/blob/v0.24.2/pkg/util/validation/validation.go
+	// dns1123LabelFmt "[a-z0-9]([-a-z0-9]*[a-z0-9])?"
+	// We want to match the opposite.
+	notdns *regexp.Regexp = regexp.MustCompile("[[:^alnum:]]")
 )
 
 func (r *IpfsReconciler) statefulSet(m *clusterv1alpha1.Ipfs,
@@ -255,6 +266,30 @@ func (r *IpfsReconciler) statefulSet(m *clusterv1alpha1.Ipfs,
 			ServiceName: serviceName,
 		},
 	}
+
+	// Add a follower container for each follow.
+	for _, follow := range m.Spec.Follows {
+		container := corev1.Container{
+			Name:            "ipfs-cluster-follow-" + notdns.ReplaceAllString(strings.ToLower(follow.Name), "-"),
+			Image:           "ipfs/ipfs-cluster:v1.0.1",
+			ImagePullPolicy: corev1.PullIfNotPresent,
+			Command: []string{
+				"ipfs-cluster-follow",
+				follow.Name,
+				"run",
+				"--init",
+				follow.Template,
+			},
+			VolumeMounts: []corev1.VolumeMount{
+				{
+					Name:      "cluster-storage",
+					MountPath: "/data/ipfs-cluster",
+				},
+			},
+		}
+		expected.Spec.Template.Spec.Containers = append(expected.Spec.Template.Spec.Containers, container)
+	}
+
 	expected.DeepCopyInto(sts)
 	ctrl.SetControllerReference(m, sts, r.Scheme)
 	return func() error {

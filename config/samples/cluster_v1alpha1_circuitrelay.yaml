@@ -1,0 +1,6 @@
+apiVersion: cluster.ipfs.io/v1alpha1
+kind: CircuitRelay
+metadata:
+  name: circuitrelay-sample
+spec:
+  # TODO(user): Add fields here

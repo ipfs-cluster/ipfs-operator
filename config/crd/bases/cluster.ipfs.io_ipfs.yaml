@@ -36,8 +36,28 @@ spec:
             properties:
               clusterStorage:
                 type: string
+              follows:
+                items:
+                  properties:
+                    name:
+                      type: string
+                    template:
+                      type: string
+                  required:
+                  - name
+                  - template
+                  type: object
+                type: array
               ipfsStorage:
                 type: string
+              networking:
+                properties:
+                  circuitRelays:
+                    format: int32
+                    type: integer
+                required:
+                - circuitRelays
+                type: object
               public:
                 type: boolean
               replicas:
@@ -47,14 +67,16 @@ spec:
                 type: string
             required:
             - clusterStorage
+            - follows
             - ipfsStorage
+            - networking
             - public
             - replicas
             - url
             type: object
           status:
             properties:
-              addresses:
+              circuitRelays:
                 items:
                   type: string
                 type: array

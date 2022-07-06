@@ -31,9 +31,13 @@ const (
 	ReconciledReasonError string = "ReconcileError"
 )
 
-type FollowParams struct {
+type followParams struct {
 	Name     string `json:"name"`
 	Template string `json:"template"`
+}
+
+type networkConfig struct {
+	CircuitRelays int32 `json:"circuitRelays"`
 }
 
 type IpfsSpec struct {
@@ -42,12 +46,13 @@ type IpfsSpec struct {
 	IpfsStorage    string         `json:"ipfsStorage"`
 	ClusterStorage string         `json:"clusterStorage"`
 	Replicas       int32          `json:"replicas"`
-	Follows        []FollowParams `json:"follows"`
+	Networking     networkConfig  `json:"networking"`
+	Follows        []followParams `json:"follows"`
 }
 
 type IpfsStatus struct {
-	Conditions []metav1.Condition `json:"conditions,omitempty"`
-	Addresses  []string           `json:"addresses,omitempty"`
+	Conditions    []metav1.Condition `json:"conditions,omitempty"`
+	CircuitRelays []string           `json:"circuitRelays,omitempty"`
 }
 
 //+kubebuilder:object:root=true

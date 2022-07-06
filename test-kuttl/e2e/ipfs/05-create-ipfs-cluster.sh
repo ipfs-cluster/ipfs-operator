@@ -14,4 +14,6 @@ spec:
   public: false
   replicas: 2
   follows: []
+  networking:
+    circuitRelays: 0
 EOF

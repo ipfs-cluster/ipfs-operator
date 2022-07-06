@@ -15,6 +15,18 @@ rules:
 - apiGroups:
   - apps
   resources:
+  - deployments
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps
+  resources:
   - statefulsets
   verbs:
   - create
@@ -24,6 +36,32 @@ rules:
   - patch
   - update
   - watch
+- apiGroups:
+  - cluster.ipfs.io
+  resources:
+  - circuitrelays
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - cluster.ipfs.io
+  resources:
+  - circuitrelays/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - cluster.ipfs.io
+  resources:
+  - circuitrelays/status
+  verbs:
+  - get
+  - patch
+  - update
 - apiGroups:
   - cluster.ipfs.io
   resources:

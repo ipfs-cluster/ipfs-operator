@@ -5,8 +5,10 @@ metadata:
   name: ipfs-sample
 spec:
   url: apps.jephilli-4-11-04-28-0655.devcluster.openshift.com 
-  ipfsStorage: 20Gi
-  clusterStorage: 20Gi
+  ipfsStorage: 50Gi
+  clusterStorage: 5Gi
   public: true
   replicas: 2
   follows: []
+  networking:
+    circuitRelays: 2

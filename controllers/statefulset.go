@@ -291,7 +291,10 @@ func (r *IpfsReconciler) statefulSet(m *clusterv1alpha1.Ipfs,
 	}
 
 	expected.DeepCopyInto(sts)
-	ctrl.SetControllerReference(m, sts, r.Scheme)
+	// FIXME: catch this error before returning a function that just errors
+	if err := ctrl.SetControllerReference(m, sts, r.Scheme); err != nil {
+		return func() error { return err }
+	}
 	return func() error {
 		sts.Spec = expected.Spec
 		return nil

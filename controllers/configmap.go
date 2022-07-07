@@ -21,7 +21,10 @@ func (r *IpfsReconciler) configMapConfig(m *clusterv1alpha1.Ipfs, cm *corev1.Con
 		},
 	}
 	expected.DeepCopyInto(cm)
-	ctrl.SetControllerReference(m, cm, r.Scheme)
+	// FIXME: catch this error before we run the function being returned
+	if err := ctrl.SetControllerReference(m, cm, r.Scheme); err != nil {
+		return func() error { return err }, ""
+	}
 	return func() error {
 		return nil
 	}, cmName

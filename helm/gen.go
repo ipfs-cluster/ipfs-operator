@@ -24,8 +24,9 @@ func DecodeObjs() (objs []map[string]any, err error) {
 }
 
 func ModifyObj(obj map[string]any) error {
+	var labels map[any]any
 	meta := obj["metadata"].(map[any]any)
-	labels, ok := meta["labels"].(map[any]any)
+	_, ok := meta["labels"].(map[any]any)
 	if !ok {
 		labels = make(map[any]any)
 		meta["labels"] = labels
@@ -35,7 +36,8 @@ func ModifyObj(obj map[string]any) error {
 	// labels["app.kubernetes.io/version"] = "{{ $.Chart.AppVersion}}"
 	// labels["helm.sh/chart"] = "{{ $.Chart.Name }}-{{ $.Chart.Version }}"
 
-	annotations, ok := meta["annotations"].(map[any]any)
+	var annotations map[any]any
+	_, ok = meta["annotations"].(map[any]any)
 	if !ok {
 		annotations = make(map[any]any)
 		meta["annotations"] = annotations
@@ -68,7 +70,10 @@ func main() {
 			baseName = crdBase
 		}
 
-		ModifyObj(obj)
+		if err := ModifyObj(obj); err != nil {
+			fmt.Printf("error modifying obj %s: %v\n", fileName, err)
+			os.Exit(1)
+		}
 
 		f, err := os.Create(fmt.Sprintf("%s/%s", baseName, fileName))
 		if err != nil {
@@ -76,6 +81,9 @@ func main() {
 		}
 		defer f.Close()
 		enc := yaml.NewEncoder(f)
-		enc.Encode(obj)
+		if err := enc.Encode(obj); err != nil {
+			fmt.Printf("error encoding obj %s: %v\n", fileName, err)
+			os.Exit(1)
+		}
 	}
 }

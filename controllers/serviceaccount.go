@@ -17,7 +17,10 @@ func (r *IpfsReconciler) serviceAccount(m *clusterv1alpha1.Ipfs, sa *corev1.Serv
 		},
 	}
 	expected.DeepCopyInto(sa)
-	ctrl.SetControllerReference(m, sa, r.Scheme)
+	// FIXME: catch this error before we run the function being returned
+	if err := ctrl.SetControllerReference(m, sa, r.Scheme); err != nil {
+		return func() error { return err }
+	}
 	return func() error {
 		return nil
 	}

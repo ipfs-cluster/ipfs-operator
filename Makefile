@@ -111,14 +111,14 @@ generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and
 lint: golangci-lint
 	$(GOLANGCILINT) run ./...
 
-.PHONY: helm-lint
-helm-lint: helm
-	cd helm && $(HELM) lint ipfs-operator
 
 .PHONY: helm-template
 helm-template: manifests kustomize
-	cp config/crd/bases/* helm/ipfs-operator/crds
-	kustomize build config/default -o helm/ipfs-operator/templates/default-gen.yaml
+	kustomize build config/default | go run helm/gen.go
+
+.PHONY: helm-lint
+helm-lint: helm helm-template
+	cd helm && $(HELM) lint ipfs-operator
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
@@ -148,7 +148,7 @@ run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./main.go
 
 .PHONY: docker-build
-docker-build: test ## Build docker image with the manager.
+docker-build: ## Build docker image with the manager.
 	docker build -t ${IMG} .
 
 .PHONY: docker-push

@@ -114,7 +114,7 @@ lint: golangci-lint
 
 .PHONY: helm-template
 helm-template: manifests kustomize
-	kustomize build config/default | go run helm/gen.go
+	$(KUSTOMIZE) build config/default | go run helm/gen.go
 
 .PHONY: helm-lint
 helm-lint: helm helm-template

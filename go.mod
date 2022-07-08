@@ -1,6 +1,6 @@
 module github.com/redhat-et/ipfs-operator
 
-go 1.17
+go 1.18
 
 require (
 	github.com/libp2p/go-libp2p-core v0.0.1

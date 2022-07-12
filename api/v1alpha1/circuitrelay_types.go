@@ -56,11 +56,9 @@ func (a *AddrInfoBasicType) AddrInfo() *peer.AddrInfo {
 }
 
 func (a *AddrInfoBasicType) DeepCopyInto(out *AddrInfoBasicType) {
-	out = new(AddrInfoBasicType)
 	addrs := make([]string, len(a.Addrs))
-	for i, addr := range a.Addrs {
-		addrs[i] = addr
-	}
+
+	copy(addrs, a.Addrs)
 	out.ID = a.ID
 	out.Addrs = addrs
 }

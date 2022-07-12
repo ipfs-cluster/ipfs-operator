@@ -112,10 +112,8 @@ func (r *IpfsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	// TODO: if we change the number of CircuitRelays, we should update
 	// the IPFS config file as well.
 	if len(instance.Status.CircuitRelays) < int(instance.Spec.Networking.CircuitRelays) {
-		var relayNames []string
 		for i := 0; int32(i) < instance.Spec.Networking.CircuitRelays; i++ {
 			name := fmt.Sprintf("%s-%d", instance.Name, i)
-			relayNames = append(relayNames, name)
 			relay := clusterv1alpha1.CircuitRelay{}
 			relay.Name = name
 			relay.Namespace = instance.Namespace
@@ -129,7 +127,9 @@ func (r *IpfsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 			}
 			instance.Status.CircuitRelays = append(instance.Status.CircuitRelays, relay.Name)
 		}
-		r.Status().Update(ctx, instance)
+		if err := r.Status().Update(ctx, instance); err != nil {
+			return ctrl.Result{}, err
+		}
 	}
 
 	// Check the status of circuit relays.
@@ -148,7 +148,9 @@ func (r *IpfsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 			return ctrl.Result{RequeueAfter: time.Minute}, nil
 		}
 	}
-	r.Status().Update(ctx, instance)
+	if err := r.Status().Update(ctx, instance); err != nil {
+		return ctrl.Result{}, err
+	}
 
 	sa := corev1.ServiceAccount{}
 	svc := corev1.Service{}

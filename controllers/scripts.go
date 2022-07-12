@@ -132,7 +132,9 @@ func (r *IpfsReconciler) configMapScripts(ctx context.Context, m *clusterv1alpha
 		},
 	}
 	expected.DeepCopyInto(cm)
-	ctrl.SetControllerReference(m, cm, r.Scheme)
+	if err := ctrl.SetControllerReference(m, cm, r.Scheme); err != nil {
+		return nil, ""
+	}
 	return func() error {
 		return nil
 	}, cmName

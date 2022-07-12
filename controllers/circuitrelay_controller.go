@@ -36,7 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	crypto "github.com/libp2p/go-libp2p-crypto"
+	"github.com/libp2p/go-libp2p-core/crypto"
 	clusterv1alpha1 "github.com/redhat-et/ipfs-operator/api/v1alpha1"
 
 	ma "github.com/multiformats/go-multiaddr"
@@ -147,7 +147,12 @@ func (r *CircuitRelayReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			}, err
 		}
 		instance.Status.AddrInfo.ID = pubkey.String()
-		r.Status().Update(ctx, instance)
+		if err := r.Status().Update(ctx, instance); err != nil {
+			log.Error(err, "error updating status")
+			return ctrl.Result{
+				RequeueAfter: time.Minute,
+			}, err
+		}
 
 		identity, err := crypto.MarshalPrivateKey(privkey)
 		if err != nil {
@@ -243,7 +248,11 @@ func (r *CircuitRelayReconciler) serviceRelay(m *clusterv1alpha1.CircuitRelay, s
 		},
 	}
 	expected.DeepCopyInto(svc)
-	ctrl.SetControllerReference(m, svc, r.Scheme)
+	if err := ctrl.SetControllerReference(m, svc, r.Scheme); err != nil {
+		return func() error {
+			return err
+		}
+	}
 	return func() error {
 		svc.Spec = expected.Spec
 		return nil
@@ -262,7 +271,11 @@ func (r *CircuitRelayReconciler) secretIdentity(m *clusterv1alpha1.CircuitRelay,
 		},
 	}
 	expected.DeepCopyInto(sec)
-	ctrl.SetControllerReference(m, sec, r.Scheme)
+	if err := ctrl.SetControllerReference(m, sec, r.Scheme); err != nil {
+		return func() error {
+			return err
+		}
+	}
 	return func() error {
 		return nil
 	}
@@ -287,7 +300,11 @@ func (r *CircuitRelayReconciler) configRelay(m *clusterv1alpha1.CircuitRelay, cm
 		},
 	}
 	expected.DeepCopyInto(cm)
-	ctrl.SetControllerReference(m, cm, r.Scheme)
+	if err := ctrl.SetControllerReference(m, cm, r.Scheme); err != nil {
+		return func() error {
+			return err
+		}
+	}
 	return func() error {
 		return nil
 	}
@@ -379,7 +396,12 @@ func (r *CircuitRelayReconciler) deploymentRelay(m *clusterv1alpha1.CircuitRelay
 		},
 	}
 	expected.DeepCopyInto(dep)
-	ctrl.SetControllerReference(m, dep, r.Scheme)
+	// FIXME: return an error before returning a function which errors
+	if err := ctrl.SetControllerReference(m, dep, r.Scheme); err != nil {
+		return func() error {
+			return err
+		}
+	}
 	return func() error {
 		dep.Spec = expected.Spec
 		return nil

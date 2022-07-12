@@ -69,7 +69,10 @@ func (r *IpfsReconciler) serviceCluster(m *clusterv1alpha1.Ipfs, svc *corev1.Ser
 		},
 	}
 	expected.DeepCopyInto(svc)
-	ctrl.SetControllerReference(m, svc, r.Scheme)
+	// FIXME: catch this error before we run the function being returned
+	if err := ctrl.SetControllerReference(m, svc, r.Scheme); err != nil {
+		return func() error { return err }, ""
+	}
 	return func() error {
 		svc.Spec = expected.Spec
 		return nil

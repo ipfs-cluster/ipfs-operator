@@ -18,7 +18,6 @@ package controllers
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 	"time"
 
@@ -33,14 +32,16 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
+	"github.com/libp2p/go-libp2p-core/peer"
 	clusterv1alpha1 "github.com/redhat-et/ipfs-operator/api/v1alpha1"
+	"github.com/redhat-et/ipfs-operator/pkg/utils"
 )
 
 const (
 	finalizer = "openshift.ifps.cluster"
 )
 
-// IpfsReconciler reconciles a Ipfs object
+// IpfsReconciler reconciles a Ipfs object.
 type IpfsReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
@@ -61,24 +62,15 @@ type IpfsReconciler struct {
 func (r *IpfsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
 	// Fetch the Ipfs instance
-	instance := &clusterv1alpha1.Ipfs{}
-	if err := r.Get(ctx, req.NamespacedName, instance); err != nil {
-		if errors.IsNotFound(err) {
-			// Request object not found, could have been deleted after reconcile request.
-			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
-			// Return and don't requeue
-			log.Info("Ipfs resource not found. Ignoring since object must be deleted")
-			return ctrl.Result{}, nil
-		}
-		// Error reading the object - requeue the request.
-		log.Error(err, "Failed to get Ipfs")
+	instance, err := r.ensureIPFSCluster(ctx, req)
+	if err != nil {
 		return ctrl.Result{}, err
 	}
 
 	// Add finalizer for this CR
 	if !controllerutil.ContainsFinalizer(instance, finalizer) {
 		controllerutil.AddFinalizer(instance, finalizer)
-		err := r.Update(ctx, instance)
+		err = r.Update(ctx, instance)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
@@ -90,17 +82,13 @@ func (r *IpfsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		return ctrl.Result{}, r.Update(ctx, instance)
 	}
 
-	priv, peerid, err := newKey()
-	if err != nil {
-		log.Error(err, "cannot generate new key")
+	// generate a new ID
+	var peerid peer.ID
+	var privStr string
+	if peerid, privStr, err = generateIdentity(); err != nil {
+		log.Error(err, "failed to generate identity")
 		return ctrl.Result{}, err
 	}
-	privBytes, err := priv.Bytes()
-	if err != nil {
-		log.Error(err, "cannot get bytes from private key")
-		return ctrl.Result{}, err
-	}
-	privStr := base64.StdEncoding.EncodeToString(privBytes)
 
 	clusSec, err := newClusterSecret()
 	if err != nil {
@@ -108,28 +96,9 @@ func (r *IpfsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		return ctrl.Result{}, err
 	}
 
-	// Create circuit relays, if necessary.
-	// TODO: if we change the number of CircuitRelays, we should update
-	// the IPFS config file as well.
-	if len(instance.Status.CircuitRelays) < int(instance.Spec.Networking.CircuitRelays) {
-		for i := 0; int32(i) < instance.Spec.Networking.CircuitRelays; i++ {
-			name := fmt.Sprintf("%s-%d", instance.Name, i)
-			relay := clusterv1alpha1.CircuitRelay{}
-			relay.Name = name
-			relay.Namespace = instance.Namespace
-			if err := ctrl.SetControllerReference(instance, &relay, r.Scheme); err != nil {
-				log.Error(err, "cannot set controller reference for new circuitRelay", "circuitRelay", relay.Name)
-				return ctrl.Result{}, err
-			}
-			if err := r.Create(ctx, &relay); err != nil {
-				log.Error(err, "cannot create new circuitRelay", "circuitRelay", relay.Name)
-				return ctrl.Result{}, err
-			}
-			instance.Status.CircuitRelays = append(instance.Status.CircuitRelays, relay.Name)
-		}
-		if err := r.Status().Update(ctx, instance); err != nil {
-			return ctrl.Result{}, err
-		}
+	if err = r.createCircuitRelays(ctx, instance); err != nil {
+		log.Error(err, "cannot create circuit relays")
+		return ctrl.Result{}, err
 	}
 
 	// Check the status of circuit relays.
@@ -138,8 +107,7 @@ func (r *IpfsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		relay := clusterv1alpha1.CircuitRelay{}
 		relay.Name = relayName
 		relay.Namespace = instance.Namespace
-		err := r.Client.Get(ctx, client.ObjectKeyFromObject(&relay), &relay)
-		if err != nil {
+		if err = r.Client.Get(ctx, client.ObjectKeyFromObject(&relay), &relay); err != nil {
 			log.Error(err, "could not lookup circuitRelay", "relay", relayName)
 			return ctrl.Result{Requeue: true}, err
 		}
@@ -148,10 +116,24 @@ func (r *IpfsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 			return ctrl.Result{RequeueAfter: time.Minute}, nil
 		}
 	}
-	if err := r.Status().Update(ctx, instance); err != nil {
+	if err = r.Status().Update(ctx, instance); err != nil {
 		return ctrl.Result{}, err
 	}
 
+	// Reconcile the tracked objects
+	trackedObjects := r.createTrackedObjects(ctx, instance, peerid, privStr, clusSec)
+	shouldRequeue := utils.CreateOrPatchTrackedObjects(ctx, trackedObjects, r.Client, log)
+	return ctrl.Result{Requeue: shouldRequeue}, nil
+}
+
+// createTrackedObjects Creates a mapping from client objects to their mutating functions.
+func (r *IpfsReconciler) createTrackedObjects(
+	ctx context.Context,
+	instance *clusterv1alpha1.Ipfs,
+	peerID peer.ID,
+	clusterSecret string,
+	privateString string,
+) map[client.Object]controllerutil.MutateFn {
 	sa := corev1.ServiceAccount{}
 	svc := corev1.Service{}
 	cmScripts := corev1.ConfigMap{}
@@ -162,8 +144,8 @@ func (r *IpfsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	mutsa := r.serviceAccount(instance, &sa)
 	mutsvc, svcName := r.serviceCluster(instance, &svc)
 	mutCmScripts, cmScriptName := r.configMapScripts(ctx, instance, &cmScripts)
-	mutCmConfig, cmConfigName := r.configMapConfig(instance, &cmConfig, peerid.String())
-	mutSecConfig, secConfigName := r.secretConfig(instance, &secConfig, []byte(clusSec), []byte(privStr))
+	mutCmConfig, cmConfigName := r.configMapConfig(instance, &cmConfig, peerID.String())
+	mutSecConfig, secConfigName := r.secretConfig(instance, &secConfig, []byte(clusterSecret), []byte(privateString))
 	mutSts := r.statefulSet(instance, &sts, svcName, secConfigName, cmConfigName, cmScriptName)
 
 	trackedObjects := map[client.Object]controllerutil.MutateFn{
@@ -174,20 +156,62 @@ func (r *IpfsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		&secConfig: mutSecConfig,
 		&sts:       mutSts,
 	}
+	return trackedObjects
+}
 
-	var requeue bool
-	for obj, mut := range trackedObjects {
-		kind := obj.GetObjectKind().GroupVersionKind()
-		name := obj.GetName()
-		result, err := controllerutil.CreateOrPatch(ctx, r.Client, obj, mut)
-		if err != nil {
-			log.Error(err, "error creating object", "objname", name, "objKind", kind.Kind, "result", result)
-			requeue = true
-		} else {
-			log.Info("object changed", "objName", name, "objKind", kind.Kind, "result", result)
-		}
+// ensureIPFSCluster Attempts to obtain an IPFS Cluster resource, and error if not found.
+func (r *IpfsReconciler) ensureIPFSCluster(
+	ctx context.Context,
+	req ctrl.Request,
+) (*clusterv1alpha1.Ipfs, error) {
+	var err error
+	instance := &clusterv1alpha1.Ipfs{}
+	if err = r.Get(ctx, req.NamespacedName, instance); err == nil {
+		return instance, nil
 	}
-	return ctrl.Result{Requeue: requeue}, nil
+	if errors.IsNotFound(err) {
+		// Request object not found, could have been deleted after reconcile request.
+		// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
+		// Return and don't requeue
+		return nil, fmt.Errorf("IPFS Cluster resource not found, ignoring since object must be deleted: %w", err)
+	}
+	// Error reading the object - requeue the request.
+	return nil, fmt.Errorf("failed to get Ipfs: %w", err)
+}
+
+// createCircuitRelays Creates the necessary amount of circuit relays if any are missing.
+// FIXME: if we change the number of CircuitRelays, we should update
+// the IPFS config file as well.
+func (r *IpfsReconciler) createCircuitRelays(
+	ctx context.Context,
+	instance *clusterv1alpha1.Ipfs,
+) error {
+	// do nothing
+	if len(instance.Status.CircuitRelays) >= int(instance.Spec.Networking.CircuitRelays) {
+		// FIXME: handle scale-down of circuit relays
+		return nil
+	}
+	// create the CircuitRelays
+	for i := 0; int32(i) < instance.Spec.Networking.CircuitRelays; i++ {
+		name := fmt.Sprintf("%s-%d", instance.Name, i)
+		relay := clusterv1alpha1.CircuitRelay{}
+		relay.Name = name
+		relay.Namespace = instance.Namespace
+		if err := ctrl.SetControllerReference(instance, &relay, r.Scheme); err != nil {
+			return fmt.Errorf(
+				"cannot set controller reference for new circuitRelay: %w, circuitRelay: %s",
+				err, relay.Name,
+			)
+		}
+		if err := r.Create(ctx, &relay); err != nil {
+			return fmt.Errorf("cannot create new circuitRelay: %w", err)
+		}
+		instance.Status.CircuitRelays = append(instance.Status.CircuitRelays, relay.Name)
+	}
+	if err := r.Status().Update(ctx, instance); err != nil {
+		return err
+	}
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

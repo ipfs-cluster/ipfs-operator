@@ -1,19 +1,22 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
 
 	"gopkg.in/yaml.v2"
 )
 
-func DecodeObjs() (objs []map[string]any, err error) {
+func DecodeObjs() ([]map[string]any, error) {
 	dec := yaml.NewDecoder(os.Stdin)
+	var objs = make([]map[string]any, 0)
 	for {
 		obj := make(map[string]any)
 		if err := dec.Decode(&obj); err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				break
 			}
 			return nil, err
@@ -24,10 +27,12 @@ func DecodeObjs() (objs []map[string]any, err error) {
 }
 
 func ModifyObj(obj map[string]any) error {
-	var labels map[any]any
-	meta := obj["metadata"].(map[any]any)
-	_, ok := meta["labels"].(map[any]any)
-	if !ok {
+	var labels, meta map[any]any
+	var ok bool
+	if meta, ok = obj["metadata"].(map[any]any); !ok {
+		return fmt.Errorf("no metadata could be found")
+	}
+	if _, ok = meta["labels"].(map[any]any); !ok {
 		labels = make(map[any]any)
 		meta["labels"] = labels
 	}
@@ -51,6 +56,7 @@ func ModifyObj(obj map[string]any) error {
 func main() {
 	templateBase := "./helm/ipfs-operator/templates"
 	crdBase := "./helm/ipfs-operator/crds"
+	var err error
 	if len(os.Args) > 1 {
 		templateBase = os.Args[1]
 	}
@@ -61,29 +67,44 @@ func main() {
 	}
 
 	for _, obj := range objs {
-		kind := obj["kind"].(string)
-		meta := obj["metadata"].(map[any]any)
-		name := meta["name"].(string)
+		var f *os.File
+		// ignore if these values are not set
+		var ok bool
+		var kind, name string
+		var meta map[any]any
+		if kind, ok = obj["kind"].(string); !ok {
+			log.Printf("no kind found in %v, skipping\n", obj)
+			continue
+		}
+		if meta, ok = obj["metadata"].(map[any]any); !ok {
+			log.Printf("no metadata could be found\n")
+			continue
+		}
+		if name, ok = meta["name"].(string); !ok {
+			log.Printf("name not found")
+			continue
+		}
+
 		fileName := fmt.Sprintf("%s-%s.yaml", kind, name)
 		baseName := templateBase
 		if kind == "CustomResourceDefinition" {
 			baseName = crdBase
 		}
 
-		if err := ModifyObj(obj); err != nil {
-			fmt.Printf("error modifying obj %s: %v\n", fileName, err)
+		if err = ModifyObj(obj); err != nil {
+			log.Printf("error modifying obj %s: %v\n", fileName, err)
 			os.Exit(1)
 		}
 
-		f, err := os.Create(fmt.Sprintf("%s/%s", baseName, fileName))
-		if err != nil {
-			panic(err)
+		if f, err = os.Create(fmt.Sprintf("%s/%s", baseName, fileName)); err != nil {
+			log.Printf("error creating file %s: %v\n", fileName, err)
+			os.Exit(1)
 		}
 		defer f.Close()
 		enc := yaml.NewEncoder(f)
-		if err := enc.Encode(obj); err != nil {
-			fmt.Printf("error encoding obj %s: %v\n", fileName, err)
-			os.Exit(1)
+		if err = enc.Encode(obj); err != nil {
+			log.Printf("error encoding obj %s: %v\n", fileName, err)
+			return
 		}
 	}
 }

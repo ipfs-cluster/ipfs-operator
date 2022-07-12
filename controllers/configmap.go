@@ -9,7 +9,11 @@ import (
 	clusterv1alpha1 "github.com/redhat-et/ipfs-operator/api/v1alpha1"
 )
 
-func (r *IpfsReconciler) configMapConfig(m *clusterv1alpha1.Ipfs, cm *corev1.ConfigMap, peerid string) (controllerutil.MutateFn, string) {
+func (r *IpfsReconciler) configMapConfig(
+	m *clusterv1alpha1.Ipfs,
+	cm *corev1.ConfigMap,
+	peerid string,
+) (controllerutil.MutateFn, string) {
 	cmName := "ipfs-cluster-" + m.Name
 	expected := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{

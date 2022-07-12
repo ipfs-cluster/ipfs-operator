@@ -18,7 +18,8 @@ import (
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-var (
+// FIXME: load these scripts directly into the container images instead of using templates.
+const (
 	entrypoint = `
 #!/bin/sh
 user=ipfs
@@ -81,7 +82,11 @@ chown -R ipfs: /data/ipfs
 `
 )
 
-func (r *IpfsReconciler) configMapScripts(ctx context.Context, m *clusterv1alpha1.Ipfs, cm *corev1.ConfigMap) (controllerutil.MutateFn, string) {
+func (r *IpfsReconciler) configMapScripts(
+	ctx context.Context,
+	m *clusterv1alpha1.Ipfs,
+	cm *corev1.ConfigMap,
+) (controllerutil.MutateFn, string) {
 	log := ctrllog.FromContext(ctx)
 	relayPeers := []*peer.AddrInfo{}
 	relayStatic := []*ma.Multiaddr{}
@@ -94,7 +99,7 @@ func (r *IpfsReconciler) configMapScripts(ctx context.Context, m *clusterv1alpha
 			log.Error(err, "could not lookup circuitRelay during confgMapScripts", "relay", relayName)
 			return nil, ""
 		}
-		if err := relay.Status.AddrInfo.Parse(); err != nil {
+		if err = relay.Status.AddrInfo.Parse(); err != nil {
 			log.Error(err, "could not parse AddrInfo. Information will not be included in config", "relay", relayName)
 			continue
 		}

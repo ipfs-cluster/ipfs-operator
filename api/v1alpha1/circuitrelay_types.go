@@ -23,7 +23,7 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 )
 
-// This is intended to mimic peer.AddrInfo
+// This is intended to mimic peer.AddrInfo.
 type AddrInfoBasicType struct {
 	ID       string        `json:"id"`
 	Addrs    []string      `json:"addrs"`
@@ -37,7 +37,8 @@ func (a *AddrInfoBasicType) Parse() error {
 	}
 	addrs := make([]ma.Multiaddr, len(a.Addrs))
 	for i, addr := range a.Addrs {
-		maddr, err := ma.NewMultiaddr(addr)
+		var maddr ma.Multiaddr
+		maddr, err = ma.NewMultiaddr(addr)
 		if err != nil {
 			return err
 		}
@@ -79,7 +80,7 @@ type CircuitRelayStatus struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
-// CircuitRelay is the Schema for the circuitrelays API
+// CircuitRelay is the Schema for the circuitrelays API.
 type CircuitRelay struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -90,7 +91,7 @@ type CircuitRelay struct {
 
 //+kubebuilder:object:root=true
 
-// CircuitRelayList contains a list of CircuitRelay
+// CircuitRelayList contains a list of CircuitRelay.
 type CircuitRelayList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`

@@ -10,7 +10,10 @@ import (
 	clusterv1alpha1 "github.com/redhat-et/ipfs-operator/api/v1alpha1"
 )
 
-func (r *IpfsReconciler) serviceCluster(m *clusterv1alpha1.Ipfs, svc *corev1.Service) (controllerutil.MutateFn, string) {
+func (r *IpfsReconciler) serviceCluster(
+	m *clusterv1alpha1.Ipfs,
+	svc *corev1.Service,
+) (controllerutil.MutateFn, string) {
 	svcName := "ipfs-cluster-" + m.Name
 	expected := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -23,43 +26,43 @@ func (r *IpfsReconciler) serviceCluster(m *clusterv1alpha1.Ipfs, svc *corev1.Ser
 				{
 					Name:       "swarm",
 					Protocol:   corev1.ProtocolTCP,
-					Port:       4001,
+					Port:       portSwarm,
 					TargetPort: intstr.FromString("swarm"),
 				},
 				{
 					Name:       "swarm-udp",
 					Protocol:   corev1.ProtocolUDP,
-					Port:       4002,
+					Port:       portSwarmUDP,
 					TargetPort: intstr.FromString("swarm-udp"),
 				},
 				{
 					Name:       "ws",
 					Protocol:   corev1.ProtocolTCP,
-					Port:       8081,
+					Port:       portWS,
 					TargetPort: intstr.FromString("ws"),
 				},
 				{
 					Name:       "http",
 					Protocol:   corev1.ProtocolTCP,
-					Port:       8080,
+					Port:       portHTTP,
 					TargetPort: intstr.FromString("http"),
 				},
 				{
 					Name:       "api-http",
 					Protocol:   corev1.ProtocolTCP,
-					Port:       9094,
+					Port:       portAPIHTTP,
 					TargetPort: intstr.FromString("api-http"),
 				},
 				{
 					Name:       "proxy-http",
 					Protocol:   corev1.ProtocolTCP,
-					Port:       9095,
+					Port:       portProxyHTTP,
 					TargetPort: intstr.FromString("proxy-http"),
 				},
 				{
 					Name:       "cluster-swarm",
 					Protocol:   corev1.ProtocolTCP,
-					Port:       9096,
+					Port:       portClusterSwarm,
 					TargetPort: intstr.FromString("cluster-swarm"),
 				},
 			},

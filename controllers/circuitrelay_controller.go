@@ -39,7 +39,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/crypto"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	clusterv1alpha1 "github.com/redhat-et/ipfs-operator/api/v1alpha1"
-	"github.com/redhat-et/ipfs-operator/pkg/utils"
+	"github.com/redhat-et/ipfs-operator/controllers/utils"
 
 	ma "github.com/multiformats/go-multiaddr"
 )

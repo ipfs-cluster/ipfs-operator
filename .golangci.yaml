@@ -7,7 +7,7 @@
 run:
   # Timeout for analysis, e.g. 30s, 5m.
   # Default: 1m
-  timeout: 3m
+  timeout: 30m
 
   # Define the Go version limit.
   # Mainly related to generics support in go1.18.

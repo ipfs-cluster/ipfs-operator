@@ -18,7 +18,7 @@ spec:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: Ipfs is the Schema for the ipfs API
+        description: Ipfs is the Schema for the ipfs API.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -36,6 +36,18 @@ spec:
             properties:
               clusterStorage:
                 type: string
+              follows:
+                items:
+                  properties:
+                    name:
+                      type: string
+                    template:
+                      type: string
+                  required:
+                  - name
+                  - template
+                  type: object
+                type: array
               ipfsStorage:
                 type: string
               networking:
@@ -55,6 +67,7 @@ spec:
                 type: string
             required:
             - clusterStorage
+            - follows
             - ipfsStorage
             - networking
             - public

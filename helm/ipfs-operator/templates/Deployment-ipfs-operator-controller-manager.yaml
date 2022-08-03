@@ -43,7 +43,7 @@ spec:
         - --leader-elect
         command:
         - /manager
-        image: quay.io/redhat-et-ipfs/ipfs-operator:v0.0.1
+        image: "quay.io/redhat-et-ipfs/ipfs-operator{{ include "container-image" (list . .Values.image) }}"
         imagePullPolicy: IfNotPresent
         livenessProbe:
           httpGet:

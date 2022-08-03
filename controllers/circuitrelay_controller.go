@@ -319,6 +319,7 @@ func (r *CircuitRelayReconciler) configRelay(
 	cmName := "libp2p-relay-daemon-config-" + m.Name
 	announceAddrs := m.Status.AddrInfo.Addrs
 
+	// nolint:lll // This includes a link
 	// Based on default configuration at
 	// https://github.com/libp2p/go-libp2p-relay-daemon/blob/a32147234644cfef5b42a9f5ccaf99b6e6021fd4/cmd/libp2p-relay-daemon/config.go#L51-L78
 	cfg := relaydaemon.Config{
@@ -373,7 +374,7 @@ func (r *CircuitRelayReconciler) configRelay(
 		},
 	}
 	expected.DeepCopyInto(cm)
-	if err := ctrl.SetControllerReference(m, cm, r.Scheme); err != nil {
+	if err = ctrl.SetControllerReference(m, cm, r.Scheme); err != nil {
 		return func() error {
 			return err
 		}

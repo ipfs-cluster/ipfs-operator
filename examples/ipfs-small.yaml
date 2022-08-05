@@ -4,10 +4,10 @@
 apiVersion: cluster.ipfs.io/v1alpha1
 kind: Ipfs
 metadata:
-  name: ipfs-sample
+  name: ipfs-cluster-small
 spec:
-  ipfsStorage: 10Gi
-  clusterStorage: 5Gi
+  ipfsStorage: 2Gi
+  clusterStorage: 1Gi
   public: false
   replicas: 1
   follows: []

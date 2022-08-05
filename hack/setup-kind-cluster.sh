@@ -1,39 +1,25 @@
 #!/bin/bash
-
 set -e -o pipefail
 
-#######################################
-# Makes sure that the KIND command is 
-# installed before continuing.
-#
-# Globals:
-#  None
-# Arguments:
-#  None
-# Returns:
-#  None
-#######################################
-function check_kind() {
-	if ! command -v kind >/dev/null 2>&1; then
-		echo "kind is not installed. Please install kind before running this script."
-		exit 1
-	else 
-		echo "kind is installed, ready to Go :)"
-	fi
-}
+# imports utils
+source ./hack/utils.sh
 
-#######################################
-# Creates a new cluster with kind.
-# Globals:
-#  CLUSTER_NAME
-# Arguments:
-#  None
-# Returns:
-#  None
-#######################################
-function setup_kind_cluster() {
-	kind create cluster --name "${CLUSTER_NAME:-kind}"
-}
-
-check_kind
-setup_kind_cluster
+# run commands or install
+case "${1:-}" in
+  "check")
+    log "Checking for required commands"
+    check_cmd docker kind kubectl
+    log "All required commands are installed"
+    ;;
+  "metallb")
+    log "Installing metallb..."
+    install_metallb
+    log "✅ installed"
+    ;;
+  *)
+    check_cmd docker kind kubectl
+    log "Setting up a kind cluster"
+    kind create cluster --name "${CLUSTER_NAME:-kind}"
+    install_metallb
+  ;;
+esac

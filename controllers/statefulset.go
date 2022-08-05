@@ -58,7 +58,8 @@ func (r *IpfsReconciler) statefulSet(m *clusterv1alpha1.Ipfs,
 	serviceName string,
 	secretName string,
 	configMapName string,
-	configMapBootstrapScriptName string) controllerutil.MutateFn {
+	configMapBootstrapScriptName string,
+) controllerutil.MutateFn {
 	ssName := "ipfs-cluster-" + m.Name
 
 	expected := &appsv1.StatefulSet{

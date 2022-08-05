@@ -20,6 +20,24 @@ function check_cmd() {
 }
 
 ######################################
+# Prints out the given message to STDOUT
+# with timestamped formatting.
+# Globals:
+#  None
+# Arguments:
+#  msg: (string) message to print
+# Returns:
+#  None
+######################################
+function log() {
+	local msg="$1"
+	# get the current time
+	local time=$(date +%Y-%m-%dT%H:%M:%S%z)
+	# print the message with printf
+	printf "[%s] %s\n" "${time}" "${msg}"
+}
+
+######################################
 # Installs MetalLB into the default namespace
 # for the current cluster.
 # Globals:
@@ -30,7 +48,6 @@ function check_cmd() {
 #  1 if MetalLB is not installed, 0 otherwise
 ######################################
 function install_metallb() {
-  echo "launched install metallb"
   local metalLBVersion='v0.12.1'
   local metalLBManifests="https://raw.githubusercontent.com/metallb/metallb/${metalLBVersion}/manifests"
   local metalLBNamespaceURL="${metalLBManifests}/namespace.yaml"
@@ -39,29 +56,31 @@ function install_metallb() {
 
   # create the metallb namespace
   if ! [[ $(kubectl apply -f "${metalLBNamespaceURL}") ]]; then
-    echo "Failed to create metallb namespace"
+    log "Failed to create metallb namespace"
     return 1
   fi
 
   # create the manifest
   if ! [[ $(kubectl apply -f "${metalLBURL}") ]]; then
-    echo "Failed to create metallb manifest"
+    log "Failed to create metallb manifest"
     return 1
   fi
 
   # wait for all pods with the label 'app=metallb' to be ready
-  echo "💤 Sleeping for 30 seconds to allow the metallb namespace to be initialized"
-  echo "📦 Waiting for pods to be ready..."
+	# HACK: find a way to wait on the parent condition for the pods instead of
+	#       waiting 30 seconds before trying to wait on the pods themselves.
+  log "💤 Sleeping for 30 seconds to allow the metallb namespace to be initialized"
   sleep 30
+  log "📦 Waiting for pods to be ready..."
   kubectl wait --for=condition=ready pod -l app=metallb -n "${metalLBNamespace}"
 
   # allocate a group of subnets to be used for the MetalLB instances
-  echo "📢 Allocating network addresses"
+  log "📢 Allocating network addresses"
   local ipamConfig=$(docker network inspect -f '{{.IPAM.Config}}' kind)
   local subnet=$(echo "${ipamConfig}" | awk '{ print $1 }')
   local regex="([0-9]+)\.([0-9]+)\.([0-9]+)\.([0-9]+)/([0-9]+)"
   if ! [[ $subnet =~ $regex ]]; then
-    echo "could not match"
+    log "could not match"
     return 1
   fi
 
@@ -73,7 +92,7 @@ function install_metallb() {
   local subnetMask="${BASH_REMATCH[5]}"
 
   if ! [[ "${subnetMask}" -eq "16" ]]; then
-    echo "subnet unsupported"
+    log "subnet unsupported"
     return 1
   fi
 

@@ -7,16 +7,18 @@ source ./hack/utils.sh
 # run commands or install
 case "${1:-}" in
   "check")
-    check_kind
+    log "Checking for required commands"
+    check_cmd docker kind kubectl
+    log "All required commands are installed"
     ;;
   "metallb")
-    echo "installing metallb..."
+    log "Installing metallb..."
     install_metallb
-    echo "✅ installed"
+    log "✅ installed"
     ;;
   *)
     check_cmd docker kind kubectl
-    echo "Setting up a kind cluster"
+    log "Setting up a kind cluster"
     kind create cluster --name "${CLUSTER_NAME:-kind}"
     install_metallb
   ;;

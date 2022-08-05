@@ -21,6 +21,3 @@ case "${1:-}" in
     install_metallb
   ;;
 esac
-
-# check_kind
-# setup_kind_cluster

@@ -121,7 +121,7 @@ func (r *IpfsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	}
 
 	// Reconcile the tracked objects
-	trackedObjects := r.createTrackedObjects(ctx, instance, peerid, privStr, clusSec)
+	trackedObjects := r.createTrackedObjects(ctx, instance, peerid, clusSec, privStr)
 	shouldRequeue := utils.CreateOrPatchTrackedObjects(ctx, trackedObjects, r.Client, log)
 	return ctrl.Result{Requeue: shouldRequeue}, nil
 }

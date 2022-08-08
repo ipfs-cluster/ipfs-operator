@@ -9,15 +9,16 @@ WORKDIR /workspace
 ARG IPFS_CLUSTER_VERSION="v1.0.2"
 ARG IPFS_CLUSTER_GIT_HASH="b2ce7d916dd2828d86954dac98495eb3aebb12bf"
 
+
 # just clone the repo at the most recent hash
 RUN git clone \
 	--depth 1 \
-	--branch=${IPFS_CLUSTER_GIT_HASH} \
+	--branch=${IPFS_CLUSTER_VERSION} \
 	https://github.com/ipfs-cluster/ipfs-cluster.git
 WORKDIR /workspace/ipfs-cluster
 
 # Ensure we have the correct IPFS Cluster release
-RUN /bin/sh -c "[[ $(git rev-list -n 1 HEAD) == ${IPFS_CLUSTER_GIT_HASH} ]]"
+RUN /bin/bash -c "[[ $(git rev-list -n 1 HEAD) == ${IPFS_CLUSTER_GIT_HASH} ]]"
 
 # this will create binaries for the following programs under cmd:
 # - cmd/ipfs-cluster-service
@@ -47,13 +48,13 @@ EXPOSE \
 
 # copy the built binaries from earlier
 COPY --from=builder \
-	/workspace/ipfs-cluster/cmd/ipfs-cluster-service \
+	/workspace/ipfs-cluster/cmd/ipfs-cluster-service/ipfs-cluster-service \
 	/usr/local/bin/ipfs-cluster-service
 COPY --from=builder \
-	/workspace/ipfs-cluster/cmd/ipfs-cluster-ctl \
+	/workspace/ipfs-cluster/cmd/ipfs-cluster-ctl/ipfs-cluster-ctl \
 	/usr/local/bin/ipfs-cluster-ctl
 COPY --from=builder \
-	/workspace/ipfs-cluster/cmd/ipfs-cluster-follow \
+	/workspace/ipfs-cluster/cmd/ipfs-cluster-follow/ipfs-cluster-follow \
 	/usr/local/bin/ipfs-cluster-follow
 
 # image args

@@ -37,8 +37,23 @@ import (
 )
 
 const (
-	MgrPort                 = 9443
-	DefaultIPFSClusterImage = "quay.io/redhat-et-ipfs/ipfs-cluster-k8s-image:latest"
+	MgrPort = 9443
+)
+
+// define flag names.
+const (
+	metricsAddrFlagName      = "metrics-bind-address"
+	probeAddrFlagName        = "health-probe-bind-address"
+	ipfsClusterImageFlagName = "ipfs-cluster-image"
+	leaderElectFlagName      = "leader-elect"
+)
+
+// define flag defaults.
+const (
+	defaultMetricsAddr      = ":8080"
+	defaultIPFSClusterImage = "quay.io/redhat-et-ipfs/ipfs-cluster-k8s-image:latest"
+	defaultProbeAddr        = ":8081"
+	defaultLeaderElect      = false
 )
 
 var (
@@ -55,13 +70,19 @@ func init() {
 // addCommandLineFlags Creates the flags to be consumed by the binary on startup,
 // and binds their values to the provided arguments.
 func addCommandLineFlags(ipfsClusterImage, metricsAddr, probeAddr *string, enableLeaderElection *bool) {
-	flag.StringVar(metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
-	flag.StringVar(probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
-	flag.StringVar(ipfsClusterImage, "ipfs-cluster-image", DefaultIPFSClusterImage, "The image to use for the ipfs-cluster container.")
-	// flag.StringVar(ipfsClusterImage, "ipfs-cluster-image", DefaultIPFSClusterImage, "The image to use for the ipfs-cluster container.")
-	flag.BoolVar(enableLeaderElection, "leader-elect", false,
+	flag.StringVar(metricsAddr, metricsAddrFlagName, defaultMetricsAddr,
+		"The address the metric endpoint binds to.",
+	)
+	flag.StringVar(probeAddr, probeAddrFlagName, defaultProbeAddr,
+		"The address the probe endpoint binds to.",
+	)
+	flag.StringVar(ipfsClusterImage, ipfsClusterImageFlagName, defaultIPFSClusterImage,
+		"The image to use for the ipfs-cluster container.",
+	)
+	flag.BoolVar(enableLeaderElection, leaderElectFlagName, defaultLeaderElect,
 		"Enable leader election for controller manager. "+
-			"Enabling this will ensure there is only one active controller manager.")
+			"Enabling this will ensure there is only one active controller manager.",
+	)
 	opts := zap.Options{
 		Development: true,
 	}

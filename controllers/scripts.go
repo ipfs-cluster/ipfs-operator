@@ -28,37 +28,7 @@ type configureIpfsOpts struct {
 }
 
 var (
-	entrypoint = `
-#!/bin/sh
-user=ipfs
-
-# This is a custom entrypoint for k8s designed to connect to the bootstrap
-# node running in the cluster. It has been set up using a configmap to
-# allow changes on the fly.
-
-
-if [ ! -f /data/ipfs-cluster/service.json ]; then
-	ipfs-cluster-service init --consensus crdt
-fi
-
-PEER_HOSTNAME=$(cat /proc/sys/kernel/hostname)
-
-grep -q ".*-0$" /proc/sys/kernel/hostname
-if [ $? -eq 0 ]; then
-	CLUSTER_ID=${BOOTSTRAP_PEER_ID} \
-	CLUSTER_PRIVATEKEY=${BOOTSTRAP_PEER_PRIV_KEY} \
-	exec ipfs-cluster-service daemon --upgrade
-else
-	BOOTSTRAP_ADDR=/dns4/${SVC_NAME}-0.${SVC_NAME}/tcp/9096/ipfs/${BOOTSTRAP_PEER_ID}
-
-	if [ -z $BOOTSTRAP_ADDR ]; then
-		exit 1
-	fi
-	# Only ipfs user can get here
-	exec ipfs-cluster-service daemon --upgrade --bootstrap $BOOTSTRAP_ADDR --leave
-fi
-`
-
+	// TODO: dockerize kubo and move this script to the container
 	configureIpfs = `
 #!/bin/sh
 set -e
@@ -91,7 +61,13 @@ chown -R ipfs: /data/ipfs
 `
 )
 
-func (r *IpfsReconciler) configMapScripts(ctx context.Context, m *clusterv1alpha1.Ipfs, cm *corev1.ConfigMap) (controllerutil.MutateFn, string) {
+// configMapScripts Returns a mutate function which loads the given configMap with scripts that
+// customize the startup of the IPFS containers depending on the values from the given IPFS cluster resource.
+func (r *IpfsReconciler) configMapScripts(
+	ctx context.Context,
+	m *clusterv1alpha1.Ipfs,
+	cm *corev1.ConfigMap,
+) (controllerutil.MutateFn, string) {
 	log := ctrllog.FromContext(ctx)
 	relayPeers := []*peer.AddrInfo{}
 	relayStatic := []*ma.Multiaddr{}
@@ -104,7 +80,7 @@ func (r *IpfsReconciler) configMapScripts(ctx context.Context, m *clusterv1alpha
 			log.Error(err, "could not lookup circuitRelay during confgMapScripts", "relay", relayName)
 			return nil, ""
 		}
-		if err := relay.Status.AddrInfo.Parse(); err != nil {
+		if err = relay.Status.AddrInfo.Parse(); err != nil {
 			log.Error(err, "could not parse AddrInfo. Information will not be included in config", "relay", relayName)
 			continue
 		}
@@ -152,7 +128,7 @@ func (r *IpfsReconciler) configMapScripts(ctx context.Context, m *clusterv1alpha
 		RelayClientJSON: string(relayClientConfigJSON),
 	}
 	configureBuf := new(bytes.Buffer)
-	configureTmpl.Execute(configureBuf, configureOpts)
+	_ = configureTmpl.Execute(configureBuf, configureOpts)
 
 	expected := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -160,12 +136,15 @@ func (r *IpfsReconciler) configMapScripts(ctx context.Context, m *clusterv1alpha
 			Namespace: m.Namespace,
 		},
 		Data: map[string]string{
-			"entrypoint.sh":     entrypoint,
 			"configure-ipfs.sh": configureBuf.String(),
 		},
 	}
 	expected.DeepCopyInto(cm)
-	ctrl.SetControllerReference(m, cm, r.Scheme)
+	if err = ctrl.SetControllerReference(m, cm, r.Scheme); err != nil {
+		return func() error {
+			return err
+		}, ""
+	}
 	return func() error {
 		return nil
 	}, cmName

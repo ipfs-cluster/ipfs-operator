@@ -48,7 +48,7 @@ const (
 	ipfsMountPath = "/data/ipfs"
 )
 
-// statefulSet Returns a mutate function that creates a StatefulSet for the
+// statefulSet Returns a mutate function that creates a statefulSet for the
 // given IPFS cluster.
 // FIXME: break this function up to use createOrUpdate and set values in the struct line-by-line
 //        instead of setting the entire thing all at once.
@@ -160,7 +160,7 @@ func (r *IpfsReconciler) statefulSet(m *clusterv1alpha1.Ipfs,
 						},
 						{
 							Name:            "ipfs-cluster",
-							Image:           ipfsClusterImage,
+							Image:           r.IPFSClusterImage,
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							Command: []string{
 								"/entry.sh",

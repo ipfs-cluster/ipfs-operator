@@ -37,7 +37,8 @@ import (
 )
 
 const (
-	MgrPort = 9443
+	MgrPort                 = 9443
+	DefaultIPFSClusterImage = "quay.io/redhat-et-ipfs/ipfs-cluster-k8s-image:latest"
 )
 
 var (
@@ -51,13 +52,14 @@ func init() {
 	//+kubebuilder:scaffold:scheme
 }
 
-func main() {
-	var metricsAddr string
-	var enableLeaderElection bool
-	var probeAddr string
-	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
-	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
-	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
+// addCommandLineFlags Creates the flags to be consumed by the binary on startup,
+// and binds their values to the provided arguments.
+func addCommandLineFlags(ipfsClusterImage, metricsAddr, probeAddr *string, enableLeaderElection *bool) {
+	flag.StringVar(metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
+	flag.StringVar(probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
+	flag.StringVar(ipfsClusterImage, "ipfs-cluster-image", DefaultIPFSClusterImage, "The image to use for the ipfs-cluster container.")
+	// flag.StringVar(ipfsClusterImage, "ipfs-cluster-image", DefaultIPFSClusterImage, "The image to use for the ipfs-cluster container.")
+	flag.BoolVar(enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
 	opts := zap.Options{
@@ -67,6 +69,14 @@ func main() {
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+}
+
+func main() {
+	var metricsAddr, probeAddr, ipfsClusterImage string
+	var enableLeaderElection bool
+
+	// set the command line flags
+	addCommandLineFlags(&ipfsClusterImage, &metricsAddr, &probeAddr, &enableLeaderElection)
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
@@ -82,8 +92,9 @@ func main() {
 	}
 
 	if err = (&controllers.IpfsReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:           mgr.GetClient(),
+		Scheme:           mgr.GetScheme(),
+		IPFSClusterImage: ipfsClusterImage,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Ipfs")
 		os.Exit(1)

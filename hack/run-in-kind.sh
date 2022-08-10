@@ -34,7 +34,7 @@ make -C ipfs-cluster-image image
 # load them into kind
 IMAGES=(
 	"quay.io/redhat-et-ipfs/ipfs-operator"
-	"ipfs-cluster-k8s-image"
+	"ipcr.io/ipfs-cluster-k8s-image"
 )
 
 for i in "${IMAGES[@]}"; do
@@ -46,6 +46,7 @@ done
 helm upgrade --install \
   --debug \
 	--set image.tag="${KIND_TAG}" \
+	--set ipfsCluster.tag="${KIND_TAG}" \
 	ipfs-cluster ./helm/ipfs-operator
 
 # TODO: implement auto-deletion of previous operator pod

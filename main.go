@@ -51,7 +51,7 @@ const (
 // define flag defaults.
 const (
 	defaultMetricsAddr      = ":8080"
-	defaultIPFSClusterImage = "quay.io/redhat-et-ipfs/ipfs-cluster-k8s-image:latest"
+	defaultIPFSClusterImage = "ipcr.io/ipfs-cluster-k8s-image:latest"
 	defaultProbeAddr        = ":8081"
 	defaultLeaderElect      = false
 )

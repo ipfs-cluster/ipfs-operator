@@ -2,7 +2,7 @@
 include ../version.mk
 
 # image
-IMAGE := ipfs-cluster-k8s-image
+IMAGE := ipcr.io/ipfs-cluster-k8s-image
 
 
 .PHONY: all

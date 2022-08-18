@@ -33,6 +33,12 @@ IMAGES=(
 	"ipcr.io/ipfs-cluster-k8s-image"
 )
 
+# build the two images
+make docker-build
+make -C ipfs-cluster-image image
+
+
+
 for i in "${IMAGES[@]}"; do
 	docker tag "${i}:latest" "${i}:${KIND_TAG}"
 	kind load docker-image "${i}:${KIND_TAG}"

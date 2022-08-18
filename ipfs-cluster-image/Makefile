@@ -2,7 +2,7 @@
 include ../version.mk
 
 # image
-IMAGE := ipcr.io/ipfs-cluster-k8s-image
+IMAGE := quay.io/redhat-et-ipfs/ipfs-cluster
 
 
 .PHONY: all

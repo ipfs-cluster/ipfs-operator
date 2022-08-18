@@ -30,7 +30,7 @@ check_cmd helm docker kind
 # load them into kind
 IMAGES=(
 	"quay.io/redhat-et-ipfs/ipfs-operator"
-	"ipcr.io/ipfs-cluster-k8s-image"
+	"quay.io/redhat-et-ipfs/ipfs-cluster"
 )
 
 # build the two images

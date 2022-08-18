@@ -11,6 +11,6 @@ image:
   tag: ""
 # ipfsCluster defines the values to be used for the IPFS Cluster container.
 ipfsCluster:
-  repository: ipcr.io/ipfs-cluster-k8s-image
+  repository: quay.io/redhat-et-ipfs/ipfs-cluster
   # tag value or the default
   tag: ""

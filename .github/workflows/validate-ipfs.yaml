@@ -134,7 +134,7 @@ jobs:
       run: |
         docker load -i /tmp/cluster.tar
         docker tag ${CLUSTER_IMAGE}:${CLUSTER_VERSION} ${CLUSTER_IMAGE}:latest
-        docker tag ${CLUSTER_IMAGE}:${CLUSTER_VERSION} ipcr.io/ipfs-cluster-k8s-image:latest
+        docker tag ${CLUSTER_IMAGE}:${CLUSTER_VERSION} quay.io/redhat-et-ipfs/ipfs-cluster:latest
 
     - name: Install the Kind binary
       run: |

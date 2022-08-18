@@ -112,7 +112,30 @@ jobs:
         curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
         sudo install ./kubectl /usr/local/bin/
         kubectl version --short --client
-    
+
+    - name: Pull the Container Image from Artifacts
+      uses: actions/download-artifact@v1
+      with:
+        name: ipfs-operator
+        path: /tmp
+
+    - name: Load the Container Image
+      run: |
+        docker load -i /tmp/operator.tar
+        docker tag ${OPERATOR_IMAGE}:${TAG} ${OPERATOR_IMAGE}:latest
+
+    - name: Pull the Container Image from Artifacts
+      uses: actions/download-artifact@v1
+      with:
+        name: cluster
+        path: /tmp
+
+    - name: Load the Container Image
+      run: |
+        docker load -i /tmp/cluster.tar
+        docker tag ${CLUSTER_IMAGE}:${CLUSTER_VERSION} ${CLUSTER_IMAGE}:latest
+        docker tag ${CLUSTER_IMAGE}:${CLUSTER_VERSION} ipcr.io/ipfs-cluster-k8s-image:latest
+
     - name: Install the Kind binary
       run: |
         curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.12.0/kind-linux-amd64
@@ -127,7 +150,9 @@ jobs:
       run: ./hack/run-in-kind.sh
 
     - name: run e2e tests
-      run: make test-e2e
+      run: |
+        mkdir bin
+        make test-e2e
 
   push-operator:
     name: Push operator container to registry

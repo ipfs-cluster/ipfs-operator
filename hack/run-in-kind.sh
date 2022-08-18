@@ -1,4 +1,4 @@
-#!/bin/bash
+#! /bin/bash
 
 set -e -o pipefail
 
@@ -27,10 +27,6 @@ function check_cmd() {
 # make sure that helm, kind, and docker are installed
 check_cmd helm docker kind
 
-# build the container images
-make docker-build
-make -C ipfs-cluster-image image
-
 # load them into kind
 IMAGES=(
 	"quay.io/redhat-et-ipfs/ipfs-operator"
@@ -47,6 +43,7 @@ helm upgrade --install \
   --debug \
 	--set image.tag="${KIND_TAG}" \
 	--set ipfsCluster.tag="${KIND_TAG}" \
+	--wait --timeout=300s \
 	ipfs-cluster ./helm/ipfs-operator
 
 # TODO: implement auto-deletion of previous operator pod

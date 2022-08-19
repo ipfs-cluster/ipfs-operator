@@ -72,7 +72,6 @@ spec:
             - networking
             - public
             - replicas
-            - url
             type: object
           status:
             properties:

@@ -2,3 +2,15 @@
 # This will change in the future.
 #
 # To re-generate this helm chart, run `make helm-template`
+
+# image defines the main controller image to be used for the manager container.
+image:
+  repository: quay.io/redhat-et-ipfs/ipfs-operator 
+  pullPolicy: IfNotPresent
+  # tag value or the default
+  tag: ""
+# ipfsCluster defines the values to be used for the IPFS Cluster container.
+ipfsCluster:
+  repository: quay.io/redhat-et-ipfs/ipfs-cluster
+  # tag value or the default
+  tag: ""

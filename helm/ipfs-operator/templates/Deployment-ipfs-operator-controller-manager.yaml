@@ -41,10 +41,11 @@ spec:
         - --health-probe-bind-address=:8081
         - --metrics-bind-address=127.0.0.1:8080
         - --leader-elect
+        - --ipfs-cluster-image={{ include "container-image" (list . .Values.ipfsCluster) }}
         command:
         - /manager
-        image: "quay.io/redhat-et-ipfs/ipfs-operator{{ include "container-image" (list . .Values.image) }}"
-        imagePullPolicy: IfNotPresent
+        image: "{{ include "container-image" (list . .Values.image) }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
         livenessProbe:
           httpGet:
             path: /healthz

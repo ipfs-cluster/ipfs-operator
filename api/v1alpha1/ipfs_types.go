@@ -41,6 +41,7 @@ type networkConfig struct {
 }
 
 type IpfsSpec struct {
+	// +kubebuilder:validation:Optional
 	URL            string         `json:"url"`
 	Public         bool           `json:"public"`
 	IpfsStorage    string         `json:"ipfsStorage"`

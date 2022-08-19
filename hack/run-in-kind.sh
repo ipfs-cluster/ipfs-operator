@@ -1,10 +1,9 @@
-#!/bin/sh
+#! /bin/bash
 
 set -e -o pipefail
 
 # Declare globals
 KIND_TAG="local-build"
-DOCKER_IMAGE="quay.io/redhat-et-ipfs/ipfs-operator"
 
 ################################
 # Makes sure the given commands are installed
@@ -28,14 +27,31 @@ function check_cmd() {
 # make sure that helm, kind, and docker are installed
 check_cmd helm docker kind
 
-# build the container image
+# load them into kind
+IMAGES=(
+	"quay.io/redhat-et-ipfs/ipfs-operator"
+	"quay.io/redhat-et-ipfs/ipfs-cluster"
+)
+
+# build the two images
 make docker-build
-docker tag "${DOCKER_IMAGE}:latest" "${DOCKER_IMAGE}:${KIND_TAG}"
-kind load docker-image "${DOCKER_IMAGE}:${KIND_TAG}"
+make -C ipfs-cluster-image image
+
+
+
+for i in "${IMAGES[@]}"; do
+	docker tag "${i}:latest" "${i}:${KIND_TAG}"
+	kind load docker-image "${i}:${KIND_TAG}"
+done
 
 # using helm, install the IPFS Cluster Operator into the current cluster
 helm upgrade --install \
   --debug \
 	--set image.tag="${KIND_TAG}" \
+	--set ipfsCluster.tag="${KIND_TAG}" \
+	--wait --timeout=300s \
 	ipfs-cluster ./helm/ipfs-operator
 
+# TODO: implement auto-deletion of previous operator pod
+# # if there is an existing operator pod running, delete it so we can properly restart
+# kubectl delete pod -l app=ipfs-operator

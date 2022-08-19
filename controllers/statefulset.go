@@ -41,14 +41,14 @@ const (
 	notDNSPattern = "[[:^alnum:]]"
 	// ipfsClusterImage Defines which container image to use when pulling IPFS Cluster.
 	// HACK: break this up so the version is parameterized, and we can inject the image locally.
-	ipfsClusterImage = "ipfs/ipfs-cluster:v1.0.1"
+	ipfsClusterImage = "ipfs-cluster-k8s-image:local-build"
 	// ipfsClusterMountPath Defines where the cluster storage volume is mounted.
 	ipfsClusterMountPath = "/data/ipfs-cluster"
 	// ipfsMountPath Defines where the IPFS volume is mounted.
 	ipfsMountPath = "/data/ipfs"
 )
 
-// statefulSet Returns a mutate function that creates a StatefulSet for the
+// statefulSet Returns a mutate function that creates a statefulSet for the
 // given IPFS cluster.
 // FIXME: break this function up to use createOrUpdate and set values in the struct line-by-line
 //        instead of setting the entire thing all at once.
@@ -58,7 +58,8 @@ func (r *IpfsReconciler) statefulSet(m *clusterv1alpha1.Ipfs,
 	serviceName string,
 	secretName string,
 	configMapName string,
-	configMapBootstrapScriptName string) controllerutil.MutateFn {
+	configMapBootstrapScriptName string,
+) controllerutil.MutateFn {
 	ssName := "ipfs-cluster-" + m.Name
 
 	expected := &appsv1.StatefulSet{
@@ -159,11 +160,13 @@ func (r *IpfsReconciler) statefulSet(m *clusterv1alpha1.Ipfs,
 						},
 						{
 							Name:            "ipfs-cluster",
-							Image:           ipfsClusterImage,
+							Image:           r.IPFSClusterImage,
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							Command: []string{
-								"sh",
-								"/custom/entrypoint.sh",
+								"/entry.sh",
+							},
+							Args: []string{
+								"run",
 							},
 							Env: []corev1.EnvVar{
 								{

@@ -112,28 +112,6 @@ jobs:
         curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
         sudo install ./kubectl /usr/local/bin/
         kubectl version --short --client
-    
-    - name: Install the Kind binary
-      run: |
-        curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.12.0/kind-linux-amd64
-        chmod +x ./kind
-        sudo mv ./kind /usr/local/bin/kind
-        kind version
-        
-    - name: Create a Kind Cluster
-      run: kind create cluster
-
-    - name: Pull the Container Image from Artifacts
-      uses: actions/download-artifact@v1
-      with:
-        name: operator-bundle
-        path: /tmp
-
-    - name: Load the Container Image
-      run: docker load -i /tmp/bundle.tar
-
-    - name: Load the Container Image into Kind
-      run: kind load docker-image ${BUNDLE_IMAGE}:${TAG}
 
     - name: Pull the Container Image from Artifacts
       uses: actions/download-artifact@v1
@@ -142,10 +120,9 @@ jobs:
         path: /tmp
 
     - name: Load the Container Image
-      run: docker load -i /tmp/operator.tar
-
-    - name: Load the Container Image into Kind
-      run: kind load docker-image ${OPERATOR_IMAGE}:${TAG}
+      run: |
+        docker load -i /tmp/operator.tar
+        docker tag ${OPERATOR_IMAGE}:${TAG} ${OPERATOR_IMAGE}:latest
 
     - name: Pull the Container Image from Artifacts
       uses: actions/download-artifact@v1
@@ -154,26 +131,28 @@ jobs:
         path: /tmp
 
     - name: Load the Container Image
-      run: docker load -i /tmp/cluster.tar
-
-    - name: Load the Container Image into Kind
-      run: kind load docker-image ${CLUSTER_IMAGE}:${CLUSTER_VERSION}
-
-    - name: Install operator-sdk
       run: |
-        curl -L -o operator-sdk https://github.com/operator-framework/operator-sdk/releases/download/v1.11.0/operator-sdk_linux_amd64
-        sudo install ./operator-sdk /usr/local/bin && rm operator-sdk
+        docker load -i /tmp/cluster.tar
+        docker tag ${CLUSTER_IMAGE}:${CLUSTER_VERSION} ${CLUSTER_IMAGE}:latest
+        docker tag ${CLUSTER_IMAGE}:${CLUSTER_VERSION} quay.io/redhat-et-ipfs/ipfs-cluster:latest
 
-    - name: Install the operator
+    - name: Install the Kind binary
       run: |
-        make bundle
-        kubectl create ns ipfs-operator-system
-        make deploy
-        kubectl get events -n ipfs-operator-system
-        kubectl get po -A
+        curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.12.0/kind-linux-amd64
+        chmod +x ./kind
+        sudo mv ./kind /usr/local/bin/kind
+        kind version
+        
+    - name: Create a Kind Cluster
+      run: ./hack/setup-kind-cluster.sh
+
+    - name: Load the Operator into Kind
+      run: ./hack/run-in-kind.sh
 
     - name: run e2e tests
-      run: make test-e2e
+      run: |
+        mkdir bin
+        make test-e2e
 
   push-operator:
     name: Push operator container to registry

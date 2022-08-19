@@ -44,7 +44,8 @@ const (
 // IpfsReconciler reconciles a Ipfs object.
 type IpfsReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme           *runtime.Scheme
+	IPFSClusterImage string
 }
 
 //+kubebuilder:rbac:groups=*,resources=*,verbs=get;list
@@ -121,7 +122,7 @@ func (r *IpfsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	}
 
 	// Reconcile the tracked objects
-	trackedObjects := r.createTrackedObjects(ctx, instance, peerid, privStr, clusSec)
+	trackedObjects := r.createTrackedObjects(ctx, instance, peerid, clusSec, privStr)
 	shouldRequeue := utils.CreateOrPatchTrackedObjects(ctx, trackedObjects, r.Client, log)
 	return ctrl.Result{Requeue: shouldRequeue}, nil
 }

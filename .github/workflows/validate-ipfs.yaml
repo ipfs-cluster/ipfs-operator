@@ -11,8 +11,8 @@ env:
   GO111MODULE: "on"
   OPERATOR_IMAGE: "quay.io/redhat-et-ipfs/ipfs-operator"
   BUNDLE_IMAGE: "quay.io/redhat-et-ipfs/ipfs-operator-bundle"
-  TAG: v0.0.1
-  CLUSTER_IMAGE: "quay.io/redhat-et-ipfs/cluster"
+  TAG: "v0.0.1"
+  IPFS_CLUSTER_K8S_IMAGE: "quay.io/redhat-et-ipfs/ipfs-cluster"
   CLUSTER_VERSION: v1.0.0
 
 
@@ -34,15 +34,15 @@ jobs:
         run: make test
 
       - name: Build operator container
-        run: make docker-build IMG=${OPERATOR_IMAGE}:${TAG}
+        run: make docker-build IMG="${OPERATOR_IMAGE}"
 
       - name: Export container image
-        run: docker save -o /tmp/operator.tar ${OPERATOR_IMAGE}:${TAG}
+        run: docker save -o /tmp/operator.tar ${OPERATOR_IMAGE}
 
       - name: Save container as artifact
         uses: actions/upload-artifact@v1
         with:
-          name: ipfs-operator
+          name: ipfs-cluster-operator
           path: /tmp/operator.tar
 
   build-bundle:
@@ -77,32 +77,30 @@ jobs:
         with:
           name: operator-bundle
           path: /tmp/bundle.tar
-
-  cluster:
-    name: build cluster image
+  
+  build-ipfs-cluster:
+    name: build-image-ipfs-cluster
     runs-on: ubuntu-20.04
-    steps: 
-    - uses: actions/checkout@v2
-      with:
-        repository: ipfs/ipfs-cluster
-        ref: ${{ env.CLUSTER_VERSION }}
 
-    - name: podman build
-      run: |
-        podman build -t ${{ env.CLUSTER_IMAGE }}:${{ env.CLUSTER_VERSION }} .
+    steps:
+    - name: Checkout source
+      uses: actions/checkout@v2
 
-    - name: save the image
-      run: podman save -o /tmp/cluster.tar ${{ env.CLUSTER_IMAGE }}:${{ env.CLUSTER_VERSION }}
+    - name: Build IPFS Cluster Kubernetes image
+      run: make -C ipfs-cluster-image image
 
-    - name: archive the image
+    - name: Export container image
+      run: docker save -o /tmp/image.tar "${IPFS_CLUSTER_K8S_IMAGE}"
+
+    - name: Save container as artifact
       uses: actions/upload-artifact@v1
       with:
-        name: cluster
-        path: /tmp/cluster.tar  
+        name: ipfs-cluster-image
+        path: /tmp/image.tar
 
-  deploy:
-    name: Deploy Kind cluster and run tests
-    needs: [ build-bundle, build-operator, cluster ]
+  e2e:
+    name: Deploy Kind cluster and run end-to-end tests
+    needs: [ build-bundle, build-operator, build-ipfs-cluster, cluster ]
     runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v2
@@ -116,25 +114,28 @@ jobs:
     - name: Pull the Container Image from Artifacts
       uses: actions/download-artifact@v1
       with:
-        name: ipfs-operator
+        name: ipfs-cluster-operator
         path: /tmp
 
     - name: Load the Container Image
       run: |
         docker load -i /tmp/operator.tar
-        docker tag ${OPERATOR_IMAGE}:${TAG} ${OPERATOR_IMAGE}:latest
+        docker inspect ${OPERATOR_IMAGE}
+        docker tag ${OPERATOR_IMAGE} ${OPERATOR_IMAGE}:ci-build
+        kind load docker-image ${OPERATOR_IMAGE}:ci-build
 
-    - name: Pull the Container Image from Artifacts
+    - name: Load the IPFS Cluster container artifact
       uses: actions/download-artifact@v1
       with:
-        name: cluster
+        name: ipfs-cluster-image
         path: /tmp
 
-    - name: Load the Container Image
+    - name: Import the IPFS Cluster container into cluster
       run: |
-        docker load -i /tmp/cluster.tar
-        docker tag ${CLUSTER_IMAGE}:${CLUSTER_VERSION} ${CLUSTER_IMAGE}:latest
-        docker tag ${CLUSTER_IMAGE}:${CLUSTER_VERSION} quay.io/redhat-et-ipfs/ipfs-cluster:latest
+        docker load -i /tmp/image.tar
+        docker inspect ${IPFS_CLUSTER_K8S_IMAGE}
+        docker tag ${IPFS_CLUSTER_K8S_IMAGE} ${IPFS_CLUSTER_K8S_IMAGE}:ci-build
+        kind load docker-image "${IPFS_CLUSTER_K8S_IMAGE}:ci-build"
 
     - name: Install the Kind binary
       run: |
@@ -147,8 +148,8 @@ jobs:
       run: ./hack/setup-kind-cluster.sh
 
     - name: Load the Operator into Kind
-      # don't build new images to reuse existing artifacts
-      run: ./hack/run-in-kind.sh --skip-build
+      # don't build new images to reuse existing artifacts, use ci-build tag
+      run: KIND_TAG="ci-build" ./hack/run-in-kind.sh --skip-build --skip-tag
 
     - name: run e2e tests
       run: |
@@ -166,13 +167,13 @@ jobs:
       - name: Pull the Container Image from Artifacts
         uses: actions/download-artifact@v1
         with:
-          name: ipfs-operator
+          name: ipfs-cluster-operator
           path: /tmp
 
       - name: Load the Container Image
         run: |
           docker load -i /tmp/operator.tar
-          docker inspect ${OPERATOR_IMAGE}:${TAG}
+          docker inspect ${OPERATOR_IMAGE}
 
       - name: Login to registry
         # If the registry server is specified in the image name, we use that.
@@ -186,6 +187,7 @@ jobs:
           (github.event_name == 'push' || github.event_name == 'schedule') &&
           github.ref == 'refs/heads/main'
         run: |
+          docker tag ${OPERATOR_IMAGE}:ci-build ${OPERATOR_IMAGE}:${TAG}
           docker push "${OPERATOR_IMAGE}:${TAG}"
 
   push-bundle:

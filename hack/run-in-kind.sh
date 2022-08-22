@@ -3,7 +3,28 @@
 set -e -o pipefail
 
 # Declare globals
-KIND_TAG="local-build"
+if ! [[ "${KIND_TAG}" == "" ]]; then
+	echo "❗ Using KIND_TAG: ${KIND_TAG} ❗"
+fi
+
+KIND_TAG="${KIND_TAG:-local-build}"
+
+
+# process arguments
+skipBuild="false"
+skipTag="false"
+
+for arg in "$@"; do
+	case "${arg}" in
+	  "--skip-build")
+			skipBuild="true"
+			;;
+		"--skip-tag")
+			skipTag="true"
+			;;
+	esac
+done
+
 
 ################################
 # Makes sure the given commands are installed
@@ -33,25 +54,25 @@ IMAGES=(
 	"quay.io/redhat-et-ipfs/ipfs-cluster"
 )
 
-# check if the --skip-build argument was provided
-skipBuild=false
-for arg in "$@"; do
-	if [ "$arg" == "--skip-build" ]; then
-		skipBuild=true
-	fi
-done
 
 # build the two images
-if [[ "$skipBuild" == false ]]; then
+if [[ "${skipBuild}" == false ]]; then
 	make docker-build
 	make -C ipfs-cluster-image image
+else
+	echo "⏩ skipping build"
 fi
 
 # tag the latest images
-for i in "${IMAGES[@]}"; do
-	docker tag "${i}:latest" "${i}:${KIND_TAG}"
-	kind load docker-image "${i}:${KIND_TAG}"
-done
+if [[ "${skipTag}" == false ]]; then
+	for i in "${IMAGES[@]}"; do
+		docker tag "${i}:latest" "${i}:${KIND_TAG}"
+		kind load docker-image "${i}:${KIND_TAG}"
+	done
+else
+  echo "⏩ skipping tag"
+fi
+
 
 # using helm, install the IPFS Cluster Operator into the current cluster
 helm upgrade --install \

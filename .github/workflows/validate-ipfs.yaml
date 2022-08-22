@@ -147,7 +147,8 @@ jobs:
       run: ./hack/setup-kind-cluster.sh
 
     - name: Load the Operator into Kind
-      run: ./hack/run-in-kind.sh
+      # don't build new images to reuse existing artifacts
+      run: ./hack/run-in-kind.sh --skip-build
 
     - name: run e2e tests
       run: |

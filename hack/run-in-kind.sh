@@ -27,18 +27,27 @@ function check_cmd() {
 # make sure that helm, kind, and docker are installed
 check_cmd helm docker kind
 
-# load them into kind
+# load images into kind
 IMAGES=(
 	"quay.io/redhat-et-ipfs/ipfs-operator"
 	"quay.io/redhat-et-ipfs/ipfs-cluster"
 )
 
+# check if the --skip-build argument was provided
+skipBuild=false
+for arg in "$@"; do
+	if [ "$arg" == "--skip-build" ]; then
+		skipBuild=true
+	fi
+done
+
 # build the two images
-make docker-build
-make -C ipfs-cluster-image image
+if [[ "$skipBuild" == false ]]; then
+	make docker-build
+	make -C ipfs-cluster-image image
+fi
 
-
-
+# tag the latest images
 for i in "${IMAGES[@]}"; do
 	docker tag "${i}:latest" "${i}:${KIND_TAG}"
 	kind load docker-image "${i}:${KIND_TAG}"

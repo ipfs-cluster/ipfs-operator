@@ -99,7 +99,7 @@ jobs:
         path: /tmp/image.tar
 
   e2e:
-    name: Deploy Kind cluster and run end-to-end tests
+    name: End-to-end tests
     needs: [ build-bundle, build-operator, build-ipfs-cluster ]
     runs-on: ubuntu-20.04
     steps:
@@ -110,6 +110,17 @@ jobs:
         curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
         sudo install ./kubectl /usr/local/bin/
         kubectl version --short --client
+
+
+    - name: Install the Kind binary
+      run: |
+        curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.12.0/kind-linux-amd64
+        chmod +x ./kind
+        sudo mv ./kind /usr/local/bin/kind
+        kind version
+        
+    - name: Create a Kind Cluster
+      run: ./hack/setup-kind-cluster.sh
 
     - name: Pull the Container Image from Artifacts
       uses: actions/download-artifact@v1
@@ -136,16 +147,6 @@ jobs:
         docker inspect ${IPFS_CLUSTER_K8S_IMAGE}
         docker tag ${IPFS_CLUSTER_K8S_IMAGE} ${IPFS_CLUSTER_K8S_IMAGE}:ci-build
         kind load docker-image "${IPFS_CLUSTER_K8S_IMAGE}:ci-build"
-
-    - name: Install the Kind binary
-      run: |
-        curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.12.0/kind-linux-amd64
-        chmod +x ./kind
-        sudo mv ./kind /usr/local/bin/kind
-        kind version
-        
-    - name: Create a Kind Cluster
-      run: ./hack/setup-kind-cluster.sh
 
     - name: Load the Operator into Kind
       # don't build new images to reuse existing artifacts, use ci-build tag

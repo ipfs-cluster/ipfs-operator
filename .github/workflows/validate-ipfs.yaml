@@ -149,8 +149,12 @@ jobs:
         kind load docker-image "${IPFS_CLUSTER_K8S_IMAGE}:ci-build"
 
     - name: Load the Operator into Kind
-      # don't build new images to reuse existing artifacts, use ci-build tag
-      run: KIND_TAG="ci-build" ./hack/run-in-kind.sh --skip-build --skip-tag
+      run: helm upgrade --install \
+        --debug \
+        --set image.tag="ci-build" \
+        --set ipfsCluster.tag="ci-build" \
+        --wait --timeout=300s \
+        ipfs-cluster ./helm/ipfs-operator
 
     - name: run e2e tests
       run: |
@@ -188,7 +192,7 @@ jobs:
           (github.event_name == 'push' || github.event_name == 'schedule') &&
           github.ref == 'refs/heads/main'
         run: |
-          docker tag ${OPERATOR_IMAGE}:ci-build ${OPERATOR_IMAGE}:${TAG}
+          docker tag ${OPERATOR_IMAGE} ${OPERATOR_IMAGE}:${TAG}
           docker push "${OPERATOR_IMAGE}:${TAG}"
 
   push-bundle:

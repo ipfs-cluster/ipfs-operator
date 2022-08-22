@@ -100,7 +100,7 @@ jobs:
 
   e2e:
     name: Deploy Kind cluster and run end-to-end tests
-    needs: [ build-bundle, build-operator, build-ipfs-cluster, cluster ]
+    needs: [ build-bundle, build-operator, build-ipfs-cluster ]
     runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v2

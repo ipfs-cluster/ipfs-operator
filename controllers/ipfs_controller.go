@@ -44,8 +44,7 @@ const (
 // IpfsReconciler reconciles a Ipfs object.
 type IpfsReconciler struct {
 	client.Client
-	Scheme           *runtime.Scheme
-	IPFSClusterImage string
+	Scheme *runtime.Scheme
 }
 
 //+kubebuilder:rbac:groups=*,resources=*,verbs=get;list

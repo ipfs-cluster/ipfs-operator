@@ -41,7 +41,7 @@ const (
 	notDNSPattern = "[[:^alnum:]]"
 	// ipfsClusterImage Defines which container image to use when pulling IPFS Cluster.
 	// HACK: break this up so the version is parameterized, and we can inject the image locally.
-	ipfsClusterImage = "ipfs-cluster-k8s-image:local-build"
+	ipfsClusterImage = "docker.io/ipfs/ipfs-cluster:1.0.2"
 	// ipfsClusterMountPath Defines where the cluster storage volume is mounted.
 	ipfsClusterMountPath = "/data/ipfs-cluster"
 	// ipfsMountPath Defines where the IPFS volume is mounted.
@@ -160,10 +160,11 @@ func (r *IpfsReconciler) statefulSet(m *clusterv1alpha1.Ipfs,
 						},
 						{
 							Name:            "ipfs-cluster",
-							Image:           r.IPFSClusterImage,
+							Image:           ipfsClusterImage,
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							Command: []string{
-								"/entry.sh",
+								"sh",
+								"/custom/entrypoint.sh",
 							},
 							Args: []string{
 								"run",

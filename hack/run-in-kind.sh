@@ -51,7 +51,6 @@ check_cmd helm docker kind
 # load images into kind
 IMAGES=(
 	"quay.io/redhat-et-ipfs/ipfs-operator"
-	"quay.io/redhat-et-ipfs/ipfs-cluster"
 )
 
 
@@ -78,7 +77,6 @@ fi
 helm upgrade --install \
   --debug \
 	--set image.tag="${KIND_TAG}" \
-	--set ipfsCluster.tag="${KIND_TAG}" \
 	--wait --timeout=300s \
 	ipfs-cluster ./helm/ipfs-operator
 

@@ -9,8 +9,3 @@ image:
   pullPolicy: IfNotPresent
   # tag value or the default
   tag: ""
-# ipfsCluster defines the values to be used for the IPFS Cluster container.
-ipfsCluster:
-  repository: quay.io/redhat-et-ipfs/ipfs-cluster
-  # tag value or the default
-  tag: ""

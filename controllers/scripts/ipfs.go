@@ -28,7 +28,7 @@ if [[ -f /data/ipfs/config ]]; then
 	exit 0
 fi
 
-ipfs init --profile=badgerds,server
+ipfs init --profile=flatfs,server
 MYSELF=$(ipfs id -f="<id>")
 
 ipfs config Addresses.API /ip4/0.0.0.0/tcp/5001
@@ -40,6 +40,9 @@ ipfs config --json Swarm.RelayClient '{{ .RelayClientJSON }}'
 ipfs config --json Swarm.EnableHolePunching true
 ipfs config --json Peering.Peers '{{ .PeersJSON }}'
 ipfs config Datastore.StorageMax 100GB
+
+# use 'next-to-last/3' as the sharding function
+sed 's/next-to-last\/2/next-to-last\/3/g' /data/ipfs/config
 
 chown -R ipfs: /data/ipfs
 `

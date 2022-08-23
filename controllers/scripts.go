@@ -1,11 +1,9 @@
 package controllers
 
 import (
-	"bytes"
 	"context"
 	encjson "encoding/json"
 	"strconv"
-	tmpl "text/template"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -16,16 +14,11 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	ma "github.com/multiformats/go-multiaddr"
 	clusterv1alpha1 "github.com/redhat-et/ipfs-operator/api/v1alpha1"
+	"github.com/redhat-et/ipfs-operator/controllers/scripts"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 )
-
-type configureIpfsOpts struct {
-	StorageMax      string
-	RelayClientJSON string
-	PeersJSON       string
-}
 
 var (
 	entrypoint = `
@@ -113,38 +106,6 @@ for op in "${@}"; do
 	esac
 done
 `
-
-	// TODO: dockerize kubo and move this script to the container
-	configureIpfs = `
-#!/bin/sh
-set -e
-set -x
-user=ipfs
-# This is a custom entrypoint for k8s designed to run ipfs nodes in an appropriate
-# setup for production scenarios.
-
-if [ -f /data/ipfs/config ]; then
-	if [ -f /data/ipfs/repo.lock ]; then
-		rm /data/ipfs/repo.lock
-	fi
-	exit 0
-fi
-
-ipfs init --profile=badgerds,server
-MYSELF=$(ipfs id -f="<id>")
-
-ipfs config Addresses.API /ip4/0.0.0.0/tcp/5001
-ipfs config Addresses.Gateway /ip4/0.0.0.0/tcp/8080
-ipfs config --json Swarm.ConnMgr.HighWater 2000
-ipfs config --json Datastore.BloomFilterSize 1048576
-ipfs config Datastore.StorageMax {{ .StorageMax }}GB
-ipfs config --json Swarm.RelayClient '{{ .RelayClientJSON }}'
-ipfs config --json Swarm.EnableHolePunching true
-ipfs config --json Peering.Peers '{{ .PeersJSON }}'
-ipfs config Datastore.StorageMax 100GB
-
-chown -R ipfs: /data/ipfs
-`
 )
 
 // configMapScripts Returns a mutate function which loads the given configMap with scripts that
@@ -183,7 +144,6 @@ func (r *IpfsReconciler) configMapScripts(
 	}
 
 	cmName := "ipfs-cluster-scripts-" + m.Name
-	configureTmpl, _ := tmpl.New("configureIpfs").Parse(configureIpfs)
 	var storageMaxGB string
 	parsed, err := resource.ParseQuantity(m.Spec.IpfsStorage)
 	if err != nil {
@@ -208,13 +168,17 @@ func (r *IpfsReconciler) configMapScripts(
 	relayClientConfigJSON, _ := json.Marshal(relayClientConfig)
 	peeringConfigJSON, _ := encjson.Marshal(relayPeers)
 
-	configureOpts := configureIpfsOpts{
-		StorageMax:      storageMaxGB,
-		PeersJSON:       string(peeringConfigJSON),
-		RelayClientJSON: string(relayClientConfigJSON),
+	// get the config script
+	configScript, err := scripts.CreateConfigureScript(
+		storageMaxGB,
+		string(peeringConfigJSON),
+		string(relayClientConfigJSON),
+	)
+	if err != nil {
+		return func() error {
+			return err
+		}, ""
 	}
-	configureBuf := new(bytes.Buffer)
-	_ = configureTmpl.Execute(configureBuf, configureOpts)
 
 	expected := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -223,7 +187,7 @@ func (r *IpfsReconciler) configMapScripts(
 		},
 		Data: map[string]string{
 			"entrypoint.sh":     entrypoint,
-			"configure-ipfs.sh": configureBuf.String(),
+			"configure-ipfs.sh": configScript,
 		},
 	}
 	expected.DeepCopyInto(cm)

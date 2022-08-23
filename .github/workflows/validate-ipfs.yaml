@@ -215,7 +215,7 @@ jobs:
         run: |
           docker load -i /tmp/bundle.tar
           docker inspect "${BUNDLE_IMAGE}:${{ env.TAG }}"
-          
+
       - name: Login to registry
         # If the registry server is specified in the image name, we use that.
         # If the server isn't in the image name, default to docker.io
@@ -265,5 +265,6 @@ jobs:
           (github.event_name == 'push' || github.event_name == 'schedule') &&
           github.ref == 'refs/heads/main'
         run: |
-          echo "Pushing to ${IPFS_CLUSTER_K8S_IMAGE}:${{ env.CLUSTER_VERSION }}"
+          echo "Pushing to ${IPFS_CLUSTER_K8S_IMAGE}:${{ env.CLUSTER_VERSION }}"  
+          docker tag "${IPFS_CLUSTER_K8S_IMAGE}" "${IPFS_CLUSTER_K8S_IMAGE}:${{ env.CLUSTER_VERSION }}"
           docker push "${IPFS_CLUSTER_K8S_IMAGE}:${{ env.CLUSTER_VERSION }}"

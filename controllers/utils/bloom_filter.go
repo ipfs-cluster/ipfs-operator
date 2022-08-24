@@ -13,7 +13,7 @@ func CalculateBloomFilterSize(ipfsStorage int64) int64 {
 	// number of blocks
 	var n, m int64
 	// false-negative rate, 1 / 1000
-	var p float64 = 0.001
+	var p = 0.001
 
 	n = ipfsStorage / blockSize
 

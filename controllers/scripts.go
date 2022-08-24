@@ -2,15 +2,14 @@ package controllers
 
 import (
 	"context"
-	encjson "encoding/json"
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/json"
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	"github.com/ipfs/kubo/config"
 	"github.com/libp2p/go-libp2p-core/peer"
 	ma "github.com/multiformats/go-multiaddr"
 	clusterv1alpha1 "github.com/redhat-et/ipfs-operator/api/v1alpha1"
@@ -28,8 +27,8 @@ func (r *IpfsReconciler) configMapScripts(
 	cm *corev1.ConfigMap,
 ) (controllerutil.MutateFn, string) {
 	log := ctrllog.FromContext(ctx)
-	relayPeers := []*peer.AddrInfo{}
-	relayStatic := []*ma.Multiaddr{}
+	relayPeers := []peer.AddrInfo{}
+	relayStatic := []string{}
 	for _, relayName := range m.Status.CircuitRelays {
 		relay := clusterv1alpha1.CircuitRelay{}
 		relay.Name = relayName
@@ -44,14 +43,14 @@ func (r *IpfsReconciler) configMapScripts(
 			continue
 		}
 		ai := relay.Status.AddrInfo.AddrInfo()
-		relayPeers = append(relayPeers, ai)
+		relayPeers = append(relayPeers, *ai)
 		p2ppart, err := ma.NewMultiaddr("/p2p/" + ai.ID.String())
 		if err != nil {
 			log.Error(err, "could not create p2p component during configMapScripts", "relay", relayName)
 		}
 		for _, addr := range ai.Addrs {
-			fullMa := addr.Encapsulate(p2ppart)
-			relayStatic = append(relayStatic, &fullMa)
+			fullMa := addr.Encapsulate(p2ppart).String()
+			relayStatic = append(relayStatic, fullMa)
 		}
 	}
 
@@ -73,18 +72,16 @@ func (r *IpfsReconciler) configMapScripts(
 		storageMaxGB = strconv.Itoa(int(reducedSize))
 	}
 
-	relayClientConfig := map[string]interface{}{
-		"Enabled":      true,
-		"StaticRelays": relayStatic,
+	relayConfig := config.RelayClient{
+		Enabled:      config.True,
+		StaticRelays: relayStatic,
 	}
-	relayClientConfigJSON, _ := json.Marshal(relayClientConfig)
-	peeringConfigJSON, _ := encjson.Marshal(relayPeers)
 
 	// get the config script
 	configScript, err := scripts.CreateConfigureScript(
 		storageMaxGB,
-		string(peeringConfigJSON),
-		string(relayClientConfigJSON),
+		relayPeers,
+		relayConfig,
 	)
 	if err != nil {
 		return func() error {

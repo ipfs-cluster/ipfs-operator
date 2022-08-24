@@ -2,13 +2,20 @@ package scripts
 
 import (
 	"bytes"
+	"encoding/json"
+	"fmt"
 	"html/template"
+	"os"
+	"strconv"
+	"strings"
+
+	"github.com/ipfs/interface-go-ipfs-core/options"
+	"github.com/ipfs/kubo/config"
+	"github.com/libp2p/go-libp2p-core/peer"
 )
 
 type configureIpfsOpts struct {
-	StorageMax      string
-	RelayClientJSON string
-	PeersJSON       string
+	FlattenedConfig string
 }
 
 const (
@@ -28,18 +35,9 @@ if [[ -f /data/ipfs/config ]]; then
 	exit 0
 fi
 
-ipfs init --profile=flatfs,server
+echo '{{ .FlattenedConfig }}' > config.json
+ipfs init -- config.json
 MYSELF=$(ipfs id -f="<id>")
-
-ipfs config Addresses.API /ip4/0.0.0.0/tcp/5001
-ipfs config Addresses.Gateway /ip4/0.0.0.0/tcp/8080
-ipfs config --json Swarm.ConnMgr.HighWater 2000
-ipfs config --json Datastore.BloomFilterSize 1048576
-ipfs config Datastore.StorageMax {{ .StorageMax }}GB
-ipfs config --json Swarm.RelayClient '{{ .RelayClientJSON }}'
-ipfs config --json Swarm.EnableHolePunching true
-ipfs config --json Peering.Peers '{{ .PeersJSON }}'
-ipfs config Datastore.StorageMax 100GB
 
 # use 'next-to-last/3' as the sharding function
 sed 's/next-to-last\/2/next-to-last\/3/g' /data/ipfs/config
@@ -133,18 +131,128 @@ done
 `
 )
 
-// CreateConfigureScript Accepts the given storageMax, peersJSON, and relayClientJSON
+// CreateConfigureScript Accepts the given storageMax, peers, and relayClient
 // and returns a completed configuration script which can be ran by the IPFS container config.
-func CreateConfigureScript(storageMax, peersJSON, relayClientJSON string) (string, error) {
+func CreateConfigureScript(storageMax string, peers []peer.AddrInfo, relayConfig config.RelayClient) (string, error) {
 	configureTmpl, _ := template.New("configureIpfs").Parse(configureIpfs)
+	config, err := createTemplateConfig(storageMax, peers, relayConfig)
+	config.Swarm.RelayClient = relayConfig
+	if err != nil {
+		return "", err
+	}
+	configBytes, err := json.Marshal(config)
+	if err != nil {
+		return "", err
+	}
 	configureOpts := configureIpfsOpts{
-		StorageMax:      storageMax,
-		PeersJSON:       peersJSON,
-		RelayClientJSON: relayClientJSON,
+		FlattenedConfig: string(configBytes),
 	}
 	configureBuf := new(bytes.Buffer)
 	if err := configureTmpl.Execute(configureBuf, configureOpts); err != nil {
 		return "", err
 	}
 	return configureBuf.String(), nil
+}
+
+// applyProfiles Applies the given list of profiles to the kubo config object.
+func applyProfiles(conf *config.Config, profiles string) error {
+	if profiles == "" {
+		return nil
+	}
+
+	for _, profile := range strings.Split(profiles, ",") {
+		transformer, ok := config.Profiles[profile]
+		if !ok {
+			return fmt.Errorf("invalid configuration profile: %s", profile)
+		}
+
+		if err := transformer.Transform(conf); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// setFlatfsShardFunc Attempts to update the given flatfs configuration to use a shardFunc
+// with the given `n`. If unsuccessful, false will be returned.
+func setFlatfsShardFunc(conf *config.Config, n uint8) error {
+	// we want to use next-to-last/3 as the sharding function
+	// as per this issue:
+	// https://github.com/redhat-et/ipfs-operator/issues/32
+	mounts, ok := conf.Datastore.Spec["mounts"].([]interface{})
+	if !ok {
+		return fmt.Errorf("could not convert mounts to interface")
+	}
+
+	// set /repo/flatfs/shard/v1/next-to-last/3 as the shardFunc for flatfs
+	for _, mount := range mounts {
+		mountMap, ok := mount.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("could not convert mount to m: string -> interface")
+		}
+		// get child
+		child, ok := mountMap["child"].(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("could not convert child to map string to interface")
+		}
+		// get type
+		dsType, ok := child["type"].(string)
+		if !ok {
+			continue
+		}
+		if dsType == "flatfs" {
+			child["shardFunc"] = "/repo/flatfs/shard/v1/next-to-last/" + strconv.FormatUint(uint64(n), 10)
+			break
+		}
+	}
+	return nil
+}
+
+// applyIPFSClusterK8sDefaults Applies settings to the given Kubo configuration
+// which are customized specifcally for running within a Kubernetes cluster.
+func applyIPFSClusterK8sDefaults(conf *config.Config, storageMax string, peers []peer.AddrInfo, rc config.RelayClient) {
+	conf.Addresses.API = config.Strings{"/ip4/0.0.0.0/tcp/5001"}
+	conf.Addresses.Gateway = config.Strings{"/ip4/0.0.0.0/tcp/8080"}
+	conf.Swarm.ConnMgr.HighWater = 2000
+	conf.Datastore.BloomFilterSize = 1048576
+	conf.Datastore.StorageMax = storageMax
+	conf.Swarm.EnableHolePunching = config.True
+
+	conf.Swarm.RelayClient = rc
+	conf.Peering.Peers = peers
+}
+
+// createTemplateConfig Returns a kubo configuration which contains preconfigured
+// settings that are optimized for running this within a Kubernetes cluster.
+func createTemplateConfig(storageMax string, peers []peer.AddrInfo, rc config.RelayClient) (conf config.Config, err error) {
+	// attempt to generate an identity
+	var identity config.Identity
+
+	// try to generate an elliptic curve key first
+	identity, err = config.CreateIdentity(os.Stdout, []options.KeyGenerateOption{
+		options.Key.Type(options.Ed25519Key),
+	})
+	// fall back to RSA
+	if err != nil {
+		identity, err = config.CreateIdentity(os.Stdout, []options.KeyGenerateOption{
+			options.Key.Type(options.RSAKey),
+			options.Key.Size(4096),
+		})
+		if err != nil {
+			return
+		}
+	}
+
+	// set keys + defaults
+	conf.Identity = identity
+
+	// apply the server + flatfs profiles
+	if err = applyProfiles(&conf, "flatfs,server"); err != nil {
+		return
+	}
+	if err = setFlatfsShardFunc(&conf, 3); err != nil {
+		return
+	}
+	applyIPFSClusterK8sDefaults(&conf, storageMax, peers, rc)
+	return
 }

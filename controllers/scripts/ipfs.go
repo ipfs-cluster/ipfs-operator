@@ -148,7 +148,7 @@ func CreateConfigureScript(storageMax string, peers []peer.AddrInfo, relayConfig
 		FlattenedConfig: string(configBytes),
 	}
 	configureBuf := new(bytes.Buffer)
-	if err := configureTmpl.Execute(configureBuf, configureOpts); err != nil {
+	if err = configureTmpl.Execute(configureBuf, configureOpts); err != nil {
 		return "", err
 	}
 	return configureBuf.String(), nil
@@ -186,17 +186,19 @@ func setFlatfsShardFunc(conf *config.Config, n uint8) error {
 
 	// set /repo/flatfs/shard/v1/next-to-last/3 as the shardFunc for flatfs
 	for _, mount := range mounts {
-		mountMap, ok := mount.(map[string]interface{})
+		var mountMap, child map[string]interface{}
+		var dsType string
+		mountMap, ok = mount.(map[string]interface{})
 		if !ok {
 			return fmt.Errorf("could not convert mount to m: string -> interface")
 		}
 		// get child
-		child, ok := mountMap["child"].(map[string]interface{})
+		child, ok = mountMap["child"].(map[string]interface{})
 		if !ok {
 			return fmt.Errorf("could not convert child to map string to interface")
 		}
 		// get type
-		dsType, ok := child["type"].(string)
+		dsType, ok = child["type"].(string)
 		if !ok {
 			continue
 		}
@@ -209,7 +211,7 @@ func setFlatfsShardFunc(conf *config.Config, n uint8) error {
 }
 
 // applyIPFSClusterK8sDefaults Applies settings to the given Kubo configuration
-// which are customized specifcally for running within a Kubernetes cluster.
+// which are customized specifically for running within a Kubernetes cluster.
 func applyIPFSClusterK8sDefaults(conf *config.Config, storageMax string, peers []peer.AddrInfo, rc config.RelayClient) {
 	conf.Addresses.API = config.Strings{"/ip4/0.0.0.0/tcp/5001"}
 	conf.Addresses.Gateway = config.Strings{"/ip4/0.0.0.0/tcp/8080"}
@@ -224,7 +226,11 @@ func applyIPFSClusterK8sDefaults(conf *config.Config, storageMax string, peers [
 
 // createTemplateConfig Returns a kubo configuration which contains preconfigured
 // settings that are optimized for running this within a Kubernetes cluster.
-func createTemplateConfig(storageMax string, peers []peer.AddrInfo, rc config.RelayClient) (conf config.Config, err error) {
+func createTemplateConfig(
+	storageMax string,
+	peers []peer.AddrInfo,
+	rc config.RelayClient,
+) (conf config.Config, err error) {
 	// attempt to generate an identity
 	var identity config.Identity
 

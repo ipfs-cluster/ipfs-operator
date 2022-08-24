@@ -119,7 +119,7 @@ linters-settings:
   nakedret:
     # Make an issue if func has more lines of code than this setting, and it has naked returns.
     # Default: 30
-    max-func-lines: 0
+    max-func-lines: 40
 
   nolintlint:
     # Exclude following linters from requiring an explanation.

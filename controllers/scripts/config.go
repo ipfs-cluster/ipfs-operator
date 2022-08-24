@@ -143,7 +143,10 @@ func CreateConfigureScript(
 	peers []peer.AddrInfo,
 	relayConfig config.RelayClient,
 	bloomFilterSize int64,
+	reproviderInterval string,
+	reproviderStrategy string,
 ) (string, error) {
+	// set settings
 	configureTmpl, _ := template.New("configureIpfs").Parse(configureIpfs)
 	config, err := createTemplateConfig(storageMax, peers, relayConfig)
 	if err != nil {
@@ -151,6 +154,10 @@ func CreateConfigureScript(
 	}
 	config.Swarm.RelayClient = relayConfig
 	config.Datastore.BloomFilterSize = int(bloomFilterSize)
+	config.Reprovider.Interval = reproviderInterval
+	config.Reprovider.Strategy = reproviderStrategy
+
+	// convert config settings into json string
 	configBytes, err := json.Marshal(config)
 	if err != nil {
 		return "", err

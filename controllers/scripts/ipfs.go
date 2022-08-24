@@ -127,13 +127,14 @@ done
 
 // CreateConfigureScript Accepts the given storageMax, peers, and relayClient
 // and returns a completed configuration script which can be ran by the IPFS container config.
-func CreateConfigureScript(storageMax string, peers []peer.AddrInfo, relayConfig config.RelayClient) (string, error) {
+func CreateConfigureScript(storageMax string, peers []peer.AddrInfo, relayConfig config.RelayClient, bloomFilterSize int64) (string, error) {
 	configureTmpl, _ := template.New("configureIpfs").Parse(configureIpfs)
 	config, err := createTemplateConfig(storageMax, peers, relayConfig)
-	config.Swarm.RelayClient = relayConfig
 	if err != nil {
 		return "", err
 	}
+	config.Swarm.RelayClient = relayConfig
+	config.Datastore.BloomFilterSize = int(bloomFilterSize)
 	configBytes, err := json.Marshal(config)
 	if err != nil {
 		return "", err

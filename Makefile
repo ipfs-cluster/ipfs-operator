@@ -130,8 +130,9 @@ vet: ## Run go vet against code.
 
 .PHONY: test
 GINKGO_ARGS ?= --progress --fail-on-pending --keep-going --cover --coverprofile=cover.profile --race --trace --json-report=report.json --timeout=3m
+GINKGO_TARGETS ?= ./...
 test: lint manifests generate fmt vet lint envtest ginkgo ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GINKGO) run $(GINKGO_ARGS) ./...
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GINKGO) run $(GINKGO_ARGS) $(GINKGO_TARGETS)
 
 .PHONY: test-e2e
 test-e2e: kuttl ## Run e2e tests. Requires cluster w/ Scribe already installed
@@ -273,7 +274,7 @@ catalog-push: ## Push a catalog image.
 	$(MAKE) docker-push IMG=$(CATALOG_IMG)
 
 
-##@ Download Utilities
+##@ Download tools
 
 # download-tool will curl any file $2 and install it to $1.
 define download-tool
@@ -282,31 +283,8 @@ set -e ;\
 echo "📥 Downloading $(2)" ;\
 curl -sSLo "$(1)" "$(2)" ;\
 chmod a+x "$(1)" ;\
-echo "✅ Done" ;\
 }
 endef
-
-# install-go-tool will download any $2 URL and install to $1
-define install-go-tool
-@[ -f $(1) ] || { \
-set -e ;\
-echo "📥 Downloading $(2)" ;\
-GOBIN=$(1) go install $(2) ;\
-echo "✅ Done" ;\
-}
-endef
-
-# install-go-tool will download any $2 URL and install to $1
-define install-go-tool-mod
-@[ -f $(1) ] || { \
-set -e ;\
-echo "📥 Downloading $(2)" ;\
-GOBIN=$(1) go install -mod=mod $(2) ;\
-echo "✅ Done" ;\
-}
-endef
-
-
 
 .PHONY: kuttl
 KUTTL := $(LOCALBIN)/kuttl

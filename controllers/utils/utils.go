@@ -33,3 +33,10 @@ func CreateOrPatchTrackedObjects(
 	}
 	return requeue
 }
+
+// ErrFunc Returns a function which returns the provided error when called.
+func ErrFunc(err error) controllerutil.MutateFn {
+	return func() error {
+		return err
+	}
+}

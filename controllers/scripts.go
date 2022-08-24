@@ -2,7 +2,7 @@ package controllers
 
 import (
 	"context"
-	"strconv"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -14,6 +14,7 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 	clusterv1alpha1 "github.com/redhat-et/ipfs-operator/api/v1alpha1"
 	"github.com/redhat-et/ipfs-operator/controllers/scripts"
+	"github.com/redhat-et/ipfs-operator/controllers/utils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
@@ -35,68 +36,52 @@ func (r *IpfsReconciler) ConfigMapScripts(
 	m *clusterv1alpha1.Ipfs,
 	cm *corev1.ConfigMap,
 ) (controllerutil.MutateFn, string) {
+	var err error
+	var parsedQuantity resource.Quantity
 	log := ctrllog.FromContext(ctx)
-	relayPeers := []peer.AddrInfo{}
-	relayStatic := []string{}
-	for _, relayName := range m.Status.CircuitRelays {
-		relay := clusterv1alpha1.CircuitRelay{}
-		relay.Name = relayName
-		relay.Namespace = m.Namespace
-		err := r.Get(ctx, client.ObjectKeyFromObject(&relay), &relay)
-		if err != nil {
-			log.Error(err, "could not lookup circuitRelay during confgMapScripts", "relay", relayName)
-			return nil, ""
-		}
-		if err = relay.Status.AddrInfo.Parse(); err != nil {
-			log.Error(err, "could not parse AddrInfo. Information will not be included in config", "relay", relayName)
-			continue
-		}
-		ai := relay.Status.AddrInfo.AddrInfo()
-		relayPeers = append(relayPeers, *ai)
-		p2ppart, err := ma.NewMultiaddr("/p2p/" + ai.ID.String())
-		if err != nil {
-			log.Error(err, "could not create p2p component during configMapScripts", "relay", relayName)
-		}
-		for _, addr := range ai.Addrs {
-			fullMa := addr.Encapsulate(p2ppart).String()
-			relayStatic = append(relayStatic, fullMa)
-		}
-	}
 
-	cmName := "ipfs-cluster-scripts-" + m.Name
-	var storageMaxGB string
-	parsed, err := resource.ParseQuantity(m.Spec.IpfsStorage)
+	relayPeers, err := r.getCircuitInfo(ctx, m)
 	if err != nil {
-		storageMaxGB = "100"
-	} else {
-		sizei64, _ := parsed.AsInt64()
-		sizeGB := sizei64 / 1024 / 1024 / 1024
-		var reducedSize int64
-		// if the disk is big, use a bigger percentage of it.
-		if sizeGB > 1024*8 {
-			reducedSize = sizeGB * 9 / 10
-		} else {
-			reducedSize = sizeGB * 8 / 10
-		}
-		storageMaxGB = strconv.Itoa(int(reducedSize))
+		log.Error(err, "could not get relay circuit info")
+		return utils.ErrFunc(fmt.Errorf("error when getting relay circuit info: %w", err)), ""
+	}
+	relayStatic, err := staticAddrsFromRelayPeers(relayPeers)
+	if err != nil {
+		log.Error(err, "could not get static addresses from relayPeers")
+		return utils.ErrFunc(fmt.Errorf("could not get static addresses: %w", err)), ""
+	}
+	// convert multiaddrs to strings
+	relayStaticStrs := make([]string, len(relayStatic))
+	for i, maddr := range relayStatic {
+		relayStaticStrs[i] = maddr.String()
 	}
 
 	relayConfig := config.RelayClient{
 		Enabled:      config.True,
-		StaticRelays: relayStatic,
+		StaticRelays: relayStaticStrs,
 	}
 
-	// get the config script
-	configScript, err := scripts.CreateConfigureScript(
-		storageMaxGB,
-		relayPeers,
-		relayConfig,
-	)
+	cmName := "ipfs-cluster-scripts-" + m.Name
+	var storageMaxGB string
+	parsedQuantity, err = resource.ParseQuantity(m.Spec.IpfsStorage)
+	if err != nil {
+		return utils.ErrFunc(err), ""
+	}
+
+	maxStorage := MaxIPFSStorage(parsedQuantity)
+	bloomFilterSize := utils.CalculateBloomFilterSize(maxStorage.AsDec().UnscaledBig().Int64())
 	if err != nil {
 		return func() error {
 			return err
 		}, ""
 	}
+	// get the config script
+	configScript, err := scripts.CreateConfigureScript(
+		storageMaxGB,
+		relayPeers,
+		relayConfig,
+		bloomFilterSize,
+	)
 
 	expected := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -117,4 +102,65 @@ func (r *IpfsReconciler) ConfigMapScripts(
 	return func() error {
 		return nil
 	}, cmName
+}
+
+// staticAddrsFromRelayPeers Extracts all of the static addresses from the
+// given list of relayPeers.
+func staticAddrsFromRelayPeers(relayPeers []peer.AddrInfo) ([]ma.Multiaddr, error) {
+	relayStatic := make([]ma.Multiaddr, 0)
+	for _, addrInfo := range relayPeers {
+		p2ppart, err := ma.NewMultiaddr("/p2p/" + addrInfo.ID.String())
+		if err != nil {
+			return nil, fmt.Errorf("could not create p2p component: %w", err)
+		}
+		for _, addr := range addrInfo.Addrs {
+			fullMa := addr.Encapsulate(p2ppart)
+			relayStatic = append(relayStatic, fullMa)
+		}
+	}
+	return relayStatic, nil
+}
+
+// getCircuitInfo Gets address info from the list of CircuitRelays
+// and returns a list of AddrInfo.
+func (r *IpfsReconciler) getCircuitInfo(
+	ctx context.Context,
+	ipfs *clusterv1alpha1.Ipfs,
+) ([]peer.AddrInfo, error) {
+	log := ctrllog.FromContext(ctx)
+	relayPeers := []peer.AddrInfo{}
+	for _, relayName := range ipfs.Status.CircuitRelays {
+		relay := clusterv1alpha1.CircuitRelay{}
+		relay.Name = relayName
+		relay.Namespace = ipfs.Namespace
+		// OPTIMIZE: do this asynchronously?
+		if err := r.Get(ctx, client.ObjectKeyFromObject(&relay), &relay); err != nil {
+			return nil, fmt.Errorf("could not lookup circuitRelay: %w", err)
+		}
+		if err := relay.Status.AddrInfo.Parse(); err != nil {
+			log.Error(err, "could not parse AddrInfo. Information will not be included in config", "relay", relayName)
+			continue
+		}
+		addrInfo := relay.Status.AddrInfo.AddrInfo()
+		relayPeers = append(relayPeers, *addrInfo)
+	}
+	return relayPeers, nil
+}
+
+// MaxIPSStorage Accepts a storage quantity and returns with a
+// calculated value to be used for setting the Max IPFS storage value
+// in Gigabytes.
+func MaxIPFSStorage(ipfsStorage resource.Quantity) resource.Quantity {
+	var storageMaxGB resource.Quantity
+	sizei64, _ := ipfsStorage.AsInt64()
+	sizeGB := sizei64 / 1024 / 1024 / 1024
+	var reducedSize int64
+	// if the disk is big, use a bigger percentage of it.
+	if sizeGB > 1024*8 {
+		reducedSize = sizeGB * 9 / 10
+	} else {
+		reducedSize = sizeGB * 8 / 10
+	}
+	storageMaxGB = *resource.NewQuantity(reducedSize, "G")
+	return storageMaxGB
 }

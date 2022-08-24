@@ -57,7 +57,6 @@ IMAGES=(
 # build the two images
 if [[ "${skipBuild}" == false ]]; then
 	make docker-build
-	make -C ipfs-cluster-image image
 else
 	echo "⏩ skipping build"
 fi

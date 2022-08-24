@@ -4,10 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"html/template"
 	"os"
 	"strconv"
-	"strings"
+	"text/template"
 
 	"github.com/ipfs/interface-go-ipfs-core/options"
 	"github.com/ipfs/kubo/config"
@@ -127,7 +126,7 @@ for op in "${@}"; do
 			exit 1
 			;;
 	esac
-done
+done 	
 `
 )
 
@@ -154,13 +153,9 @@ func CreateConfigureScript(storageMax string, peers []peer.AddrInfo, relayConfig
 	return configureBuf.String(), nil
 }
 
-// applyProfiles Applies the given list of profiles to the kubo config object.
-func applyProfiles(conf *config.Config, profiles string) error {
-	if profiles == "" {
-		return nil
-	}
-
-	for _, profile := range strings.Split(profiles, ",") {
+// applyFlatfsServer Applies the given list of profiles to the kubo config object.
+func applyFlatfsServer(conf *config.Config) error {
+	for _, profile := range []string{"flatfs", "server"} {
 		transformer, ok := config.Profiles[profile]
 		if !ok {
 			return fmt.Errorf("invalid configuration profile: %s", profile)
@@ -253,7 +248,7 @@ func createTemplateConfig(
 	conf.Identity = identity
 
 	// apply the server + flatfs profiles
-	if err = applyProfiles(&conf, "flatfs,server"); err != nil {
+	if err = applyFlatfsServer(&conf); err != nil {
 		return
 	}
 	if err = setFlatfsShardFunc(&conf, 3); err != nil {

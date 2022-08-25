@@ -47,7 +47,7 @@ const (
 	// ipfsMountPath Defines where the IPFS volume is mounted.
 	ipfsMountPath = "/data/ipfs"
 	// ipfsImage Defines which image we should pull when running IPFS containers.
-	ipfsImage = "docker.io/ipfs/go-ipfs:v0.12.2"
+	ipfsImage = "docker.io/ipfs/kubo:v0.14.0"
 )
 
 // statefulSet Returns a mutate function that creates a statefulSet for the

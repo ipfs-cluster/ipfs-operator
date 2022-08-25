@@ -18,7 +18,6 @@ type configureIpfsOpts struct {
 }
 
 const (
-	// TODO: dockerize kubo and move this script to the container
 	configureIpfs = `
 #!/bin/sh
 set -e
@@ -36,10 +35,6 @@ fi
 
 echo '{{ .FlattenedConfig }}' > config.json
 ipfs init -- config.json
-MYSELF=$(ipfs id -f="<id>")
-
-# use 'next-to-last/3' as the sharding function
-sed 's/next-to-last\/2/next-to-last\/3/g' /data/ipfs/config
 
 chown -R ipfs: /data/ipfs
 `
@@ -126,7 +121,7 @@ for op in "${@}"; do
 			exit 1
 			;;
 	esac
-done 	
+done
 `
 )
 
@@ -233,17 +228,9 @@ func createTemplateConfig(
 	identity, err = config.CreateIdentity(os.Stdout, []options.KeyGenerateOption{
 		options.Key.Type(options.Ed25519Key),
 	})
-	// fall back to RSA
 	if err != nil {
-		identity, err = config.CreateIdentity(os.Stdout, []options.KeyGenerateOption{
-			options.Key.Type(options.RSAKey),
-			options.Key.Size(4096),
-		})
-		if err != nil {
-			return
-		}
+		return
 	}
-
 	// set keys + defaults
 	conf.Identity = identity
 

@@ -208,8 +208,8 @@ func applyIPFSClusterK8sDefaults(conf *config.Config, storageMax string, peers [
 	conf.Swarm.ConnMgr.HighWater = 2000
 	conf.Datastore.BloomFilterSize = 1048576
 	conf.Datastore.StorageMax = storageMax
+	conf.Addresses.Swarm = []string{"/ip4/0.0.0.0/tcp/4001", "/ip6/::/tcp/4001"}
 	conf.Swarm.EnableHolePunching = config.True
-
 	conf.Swarm.RelayClient = rc
 	conf.Peering.Peers = peers
 }

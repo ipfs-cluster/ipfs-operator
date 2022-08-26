@@ -46,6 +46,8 @@ const (
 	ipfsClusterMountPath = "/data/ipfs-cluster"
 	// ipfsMountPath Defines where the IPFS volume is mounted.
 	ipfsMountPath = "/data/ipfs"
+	// ipfsImage Defines which image we should pull when running IPFS containers.
+	ipfsImage = "docker.io/ipfs/kubo:v0.14.0"
 )
 
 // statefulSet Returns a mutate function that creates a statefulSet for the
@@ -85,7 +87,7 @@ func (r *IpfsReconciler) statefulSet(m *clusterv1alpha1.Ipfs,
 					InitContainers: []corev1.Container{
 						{
 							Name:  "configure-ipfs",
-							Image: "ipfs/go-ipfs:v0.12.2",
+							Image: ipfsImage,
 							Command: []string{
 								"sh",
 								"/custom/configure-ipfs.sh",
@@ -105,7 +107,7 @@ func (r *IpfsReconciler) statefulSet(m *clusterv1alpha1.Ipfs,
 					Containers: []corev1.Container{
 						{
 							Name:            "ipfs",
-							Image:           "ipfs/go-ipfs:v0.12.2",
+							Image:           ipfsImage,
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							Env: []corev1.EnvVar{
 								{

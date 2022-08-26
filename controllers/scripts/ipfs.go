@@ -212,6 +212,7 @@ func applyIPFSClusterK8sDefaults(conf *config.Config, storageMax string, peers [
 	conf.Swarm.EnableHolePunching = config.False
 	conf.Swarm.RelayClient = rc
 	conf.Peering.Peers = peers
+	conf.Experimental.AcceleratedDHTClient = true
 }
 
 // createTemplateConfig Returns a kubo configuration which contains preconfigured

@@ -129,8 +129,8 @@ vet: ## Run go vet against code.
 	go vet ./...
 
 .PHONY: test
-GINKGO_ARGS ?= -outputdir . -cover -coverprofile cover.out -progress
-test: lint manifests generate fmt vet lint helm-lint envtest ginkgo ## Run tests.
+GINKGO_ARGS ?= -r --procs=4 --compilers=2 --randomize-all --randomize-suites --fail-on-pending --keep-going --cover --coverprofile=cover.profile --race --trace --json-report=report.json --timeout=30s
+test: lint manifests generate fmt vet lint envtest ginkgo ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GINKGO) $(GINKGO_ARGS) ./...
 
 .PHONY: test-e2e
@@ -296,6 +296,17 @@ echo "✅ Done" ;\
 }
 endef
 
+# install-go-tool will download any $2 URL and install to $1
+define install-go-tool-mod
+@[ -f $(1) ] || { \
+set -e ;\
+echo "📥 Downloading $(2)" ;\
+GOBIN=$(1) go install -mod=mod $(2) ;\
+echo "✅ Done" ;\
+}
+endef
+
+
 
 .PHONY: kuttl
 KUTTL := $(LOCALBIN)/kuttl
@@ -308,7 +319,7 @@ GINKGO := $(LOCALBIN)/ginkgo
 GINKGO_URL := github.com/onsi/ginkgo/v2/ginkgo
 ginkgo: $(GINKGO) ## Install ginkgo
 $(GINKGO): $(LOCALBIN)
-	$(call install-go-tool,$(LOCALBIN),$(GINKGO_URL))
+	$(call install-go-tool-mod,$(LOCALBIN),$(GINKGO_URL))
 
 
 .PHONY: kustomize

@@ -1,0 +1,14 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  annotations: {}
+  labels: {}
+  name: ipfs-operator-proxy-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: ipfs-operator-proxy-role
+subjects:
+- kind: ServiceAccount
+  name: ipfs-operator-controller-manager
+  namespace: ipfs-operator-system

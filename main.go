@@ -36,6 +36,24 @@ import (
 	//+kubebuilder:scaffold:imports
 )
 
+const (
+	MgrPort = 9443
+)
+
+// define flag names.
+const (
+	metricsAddrFlagName = "metrics-bind-address"
+	probeAddrFlagName   = "health-probe-bind-address"
+	leaderElectFlagName = "leader-elect"
+)
+
+// define flag defaults.
+const (
+	defaultMetricsAddr = ":8080"
+	defaultProbeAddr   = ":8081"
+	defaultLeaderElect = false
+)
+
 var (
 	scheme   = runtime.NewScheme()
 	setupLog = ctrl.Log.WithName("setup")
@@ -47,15 +65,19 @@ func init() {
 	//+kubebuilder:scaffold:scheme
 }
 
-func main() {
-	var metricsAddr string
-	var enableLeaderElection bool
-	var probeAddr string
-	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
-	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
-	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
+// addCommandLineFlags Creates the flags to be consumed by the binary on startup,
+// and binds their values to the provided arguments.
+func addCommandLineFlags(metricsAddr, probeAddr *string, enableLeaderElection *bool) {
+	flag.StringVar(metricsAddr, metricsAddrFlagName, defaultMetricsAddr,
+		"The address the metric endpoint binds to.",
+	)
+	flag.StringVar(probeAddr, probeAddrFlagName, defaultProbeAddr,
+		"The address the probe endpoint binds to.",
+	)
+	flag.BoolVar(enableLeaderElection, leaderElectFlagName, defaultLeaderElect,
 		"Enable leader election for controller manager. "+
-			"Enabling this will ensure there is only one active controller manager.")
+			"Enabling this will ensure there is only one active controller manager.",
+	)
 	opts := zap.Options{
 		Development: true,
 	}
@@ -63,11 +85,19 @@ func main() {
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+}
+
+func main() {
+	var metricsAddr, probeAddr string
+	var enableLeaderElection bool
+
+	// set the command line flags
+	addCommandLineFlags(&metricsAddr, &probeAddr, &enableLeaderElection)
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
 		MetricsBindAddress:     metricsAddr,
-		Port:                   9443,
+		Port:                   MgrPort,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "658003f6.ipfs.io",
@@ -93,17 +123,17 @@ func main() {
 	}
 	//+kubebuilder:scaffold:builder
 
-	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
+	if err = mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up health check")
 		os.Exit(1)
 	}
-	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
+	if err = mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up ready check")
 		os.Exit(1)
 	}
 
 	setupLog.Info("starting manager")
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+	if err = mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}

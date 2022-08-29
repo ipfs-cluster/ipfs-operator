@@ -22,12 +22,12 @@ import (
 
 const (
 	// ConditionReconciled is a status condition type that indicates whether the
-	// CR has been successfully reconciled
+	// CR has been successfully reconciled.
 	ConditionReconciled string = "Reconciled"
-	// ReconciledReasonComplete indicates the CR was successfully reconciled
+	// ReconciledReasonComplete indicates the CR was successfully reconciled.
 	ReconciledReasonComplete string = "ReconcileComplete"
 	// ReconciledReasonError indicates an error was encountered while
-	// reconciling the CR
+	// reconciling the CR.
 	ReconciledReasonError string = "ReconcileError"
 )
 
@@ -41,6 +41,7 @@ type networkConfig struct {
 }
 
 type IpfsSpec struct {
+	// +kubebuilder:validation:Optional
 	URL            string         `json:"url"`
 	Public         bool           `json:"public"`
 	IpfsStorage    string         `json:"ipfsStorage"`
@@ -58,7 +59,7 @@ type IpfsStatus struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
-// Ipfs is the Schema for the ipfs API
+// Ipfs is the Schema for the ipfs API.
 type Ipfs struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -69,7 +70,7 @@ type Ipfs struct {
 
 //+kubebuilder:object:root=true
 
-// IpfsList contains a list of Ipfs
+// IpfsList contains a list of Ipfs.
 type IpfsList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`

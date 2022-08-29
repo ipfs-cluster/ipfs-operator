@@ -15,20 +15,55 @@ import (
 	clusterv1alpha1 "github.com/redhat-et/ipfs-operator/api/v1alpha1"
 )
 
-var (
-	// objects need to be RFC-1123 compliant, and k8s uses this regex to test.
-	// https://github.com/kubernetes/apimachinery/blob/v0.24.2/pkg/util/validation/validation.go
-	// dns1123LabelFmt "[a-z0-9]([-a-z0-9]*[a-z0-9])?"
-	// We want to match the opposite.
-	notdns *regexp.Regexp = regexp.MustCompile("[[:^alnum:]]")
+// These declare constants for timeouts.
+const (
+	secondsPerMinute = 60
+	tenSeconds       = 10
+	thirtySeconds    = 30
 )
 
+// Defines port numbers to be used by the IPFS containers.
+const (
+	portAPIHTTP      = 9094
+	portProxyHTTP    = 9095
+	portClusterSwarm = 9096
+	portSwarm        = 4001
+	portSwarmUDP     = 4002
+	portAPI          = 5001
+	portPprof        = 6060
+	portWS           = 8081
+	portHTTP         = 8080
+)
+
+// Misclaneous constants.
+const (
+	// notDNSPattern Defines a ReGeX pattern to match non-DNS names.
+	notDNSPattern = "[[:^alnum:]]"
+	// ipfsClusterImage Defines which container image to use when pulling IPFS Cluster.
+	// HACK: break this up so the version is parameterized, and we can inject the image locally.
+	ipfsClusterImage = "docker.io/ipfs/ipfs-cluster:1.0.2"
+	// ipfsClusterMountPath Defines where the cluster storage volume is mounted.
+	ipfsClusterMountPath = "/data/ipfs-cluster"
+	// ipfsMountPath Defines where the IPFS volume is mounted.
+	ipfsMountPath = "/data/ipfs"
+	// ipfsImage Defines which image we should pull when running IPFS containers.
+	ipfsImage = "docker.io/ipfs/kubo:v0.14.0"
+)
+
+// statefulSet Returns a mutate function that creates a statefulSet for the
+// given IPFS cluster.
+// FIXME: break this function up to use createOrUpdate and set values in the struct line-by-line
+//
+//	instead of setting the entire thing all at once.
+//
+// nolint:funlen // Function is long due to Kube resource definitions
 func (r *IpfsReconciler) statefulSet(m *clusterv1alpha1.Ipfs,
 	sts *appsv1.StatefulSet,
 	serviceName string,
 	secretName string,
 	configMapName string,
-	configMapBootstrapScriptName string) controllerutil.MutateFn {
+	configMapBootstrapScriptName string,
+) controllerutil.MutateFn {
 	ssName := "ipfs-cluster-" + m.Name
 
 	var ipfsResources corev1.ResourceRequirements
@@ -93,7 +128,7 @@ func (r *IpfsReconciler) statefulSet(m *clusterv1alpha1.Ipfs,
 					InitContainers: []corev1.Container{
 						{
 							Name:  "configure-ipfs",
-							Image: "ipfs/go-ipfs:v0.12.2",
+							Image: ipfsImage,
 							Command: []string{
 								"sh",
 								"/custom/configure-ipfs.sh",
@@ -113,7 +148,7 @@ func (r *IpfsReconciler) statefulSet(m *clusterv1alpha1.Ipfs,
 					Containers: []corev1.Container{
 						{
 							Name:            "ipfs",
-							Image:           "ipfs/go-ipfs:v0.12.2",
+							Image:           ipfsImage,
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							Env: []corev1.EnvVar{
 								{
@@ -124,27 +159,27 @@ func (r *IpfsReconciler) statefulSet(m *clusterv1alpha1.Ipfs,
 							Ports: []corev1.ContainerPort{
 								{
 									Name:          "swarm",
-									ContainerPort: 4001,
+									ContainerPort: portSwarm,
 									Protocol:      corev1.ProtocolTCP,
 								},
 								{
 									Name:          "swarm-udp",
-									ContainerPort: 4002,
+									ContainerPort: portSwarmUDP,
 									Protocol:      corev1.ProtocolUDP,
 								},
 								{
 									Name:          "api",
-									ContainerPort: 5001,
+									ContainerPort: portAPI,
 									Protocol:      corev1.ProtocolTCP,
 								},
 								{
 									Name:          "ws",
-									ContainerPort: 8081,
+									ContainerPort: portWS,
 									Protocol:      corev1.ProtocolTCP,
 								},
 								{
 									Name:          "http",
-									ContainerPort: 8080,
+									ContainerPort: portHTTP,
 									Protocol:      corev1.ProtocolTCP,
 								},
 							},
@@ -154,25 +189,28 @@ func (r *IpfsReconciler) statefulSet(m *clusterv1alpha1.Ipfs,
 										Port: intstr.FromString("swarm"),
 									},
 								},
-								InitialDelaySeconds: 30,
-								TimeoutSeconds:      10,
-								PeriodSeconds:       60,
+								InitialDelaySeconds: thirtySeconds,
+								TimeoutSeconds:      tenSeconds,
+								PeriodSeconds:       secondsPerMinute,
 							},
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      "ipfs-storage",
-									MountPath: "/data/ipfs",
+									MountPath: ipfsMountPath,
 								},
 							},
 							Resources: ipfsResources,
 						},
 						{
 							Name:            "ipfs-cluster",
-							Image:           "ipfs/ipfs-cluster:v1.0.1",
+							Image:           ipfsClusterImage,
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							Command: []string{
 								"sh",
 								"/custom/entrypoint.sh",
+							},
+							Args: []string{
+								"run",
 							},
 							Env: []corev1.EnvVar{
 								{
@@ -220,17 +258,17 @@ func (r *IpfsReconciler) statefulSet(m *clusterv1alpha1.Ipfs,
 							Ports: []corev1.ContainerPort{
 								{
 									Name:          "api-http",
-									ContainerPort: 9094,
+									ContainerPort: portAPIHTTP,
 									Protocol:      corev1.ProtocolTCP,
 								},
 								{
 									Name:          "proxy-http",
-									ContainerPort: 9095,
+									ContainerPort: portProxyHTTP,
 									Protocol:      corev1.ProtocolUDP,
 								},
 								{
 									Name:          "cluster-swarm",
-									ContainerPort: 9096,
+									ContainerPort: portClusterSwarm,
 									Protocol:      corev1.ProtocolTCP,
 								},
 							},
@@ -240,14 +278,14 @@ func (r *IpfsReconciler) statefulSet(m *clusterv1alpha1.Ipfs,
 										Port: intstr.FromString("cluster-swarm"),
 									},
 								},
-								InitialDelaySeconds: 30,
-								TimeoutSeconds:      10,
-								PeriodSeconds:       60,
+								InitialDelaySeconds: thirtySeconds,
+								TimeoutSeconds:      tenSeconds,
+								PeriodSeconds:       secondsPerMinute,
 							},
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      "cluster-storage",
-									MountPath: "/data/ipfs-cluster",
+									MountPath: ipfsClusterMountPath,
 								},
 								{
 									Name:      "configure-script",
@@ -308,10 +346,31 @@ func (r *IpfsReconciler) statefulSet(m *clusterv1alpha1.Ipfs,
 	}
 
 	// Add a follower container for each follow.
+	follows := followContainers(m)
+	expected.Spec.Template.Spec.Containers = append(expected.Spec.Template.Spec.Containers, follows...)
+	expected.DeepCopyInto(sts)
+	// FIXME: catch this error before returning a function that just errors
+	if err := ctrl.SetControllerReference(m, sts, r.Scheme); err != nil {
+		return func() error { return err }
+	}
+	return func() error {
+		sts.Spec = expected.Spec
+		return nil
+	}
+}
+
+// followContainers Returns a list of container objects which follow the given followParams.
+func followContainers(m *clusterv1alpha1.Ipfs) []corev1.Container {
+	// objects need to be RFC-1123 compliant, and k8s uses this regex to test.
+	// https://github.com/kubernetes/apimachinery/blob/v0.24.2/pkg/util/validation/validation.go
+	// dns1123LabelFmt "[a-z0-9]([-a-z0-9]*[a-z0-9])?"
+	// We want to match the opposite.
+	var notdns = regexp.MustCompile(notDNSPattern)
+	containers := make([]corev1.Container, 0)
 	for _, follow := range m.Spec.Follows {
 		container := corev1.Container{
 			Name:            "ipfs-cluster-follow-" + notdns.ReplaceAllString(strings.ToLower(follow.Name), "-"),
-			Image:           "ipfs/ipfs-cluster:v1.0.1",
+			Image:           ipfsClusterImage,
 			ImagePullPolicy: corev1.PullIfNotPresent,
 			Command: []string{
 				"ipfs-cluster-follow",
@@ -323,17 +382,11 @@ func (r *IpfsReconciler) statefulSet(m *clusterv1alpha1.Ipfs,
 			VolumeMounts: []corev1.VolumeMount{
 				{
 					Name:      "cluster-storage",
-					MountPath: "/data/ipfs-cluster",
+					MountPath: ipfsClusterMountPath,
 				},
 			},
 		}
-		expected.Spec.Template.Spec.Containers = append(expected.Spec.Template.Spec.Containers, container)
+		containers = append(containers, container)
 	}
-
-	expected.DeepCopyInto(sts)
-	ctrl.SetControllerReference(m, sts, r.Scheme)
-	return func() error {
-		sts.Spec = expected.Spec
-		return nil
-	}
+	return containers
 }

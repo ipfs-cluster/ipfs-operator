@@ -29,3 +29,6 @@ test-e2e/kubeconfig
 
 # don't include vendor/
 vendor/*
+
+# use this directory for files during development that shouldn't be pushed
+temp/*

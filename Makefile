@@ -1,4 +1,10 @@
+GOLANGCI_VERSION := v1.46.1
+HELM_VERSION := v3.8.2
 KUTTL_VERSION := 0.10.0
+
+
+OS := $(shell go env GOOS)
+ARCH := $(shell go env GOARCH)
 
 # VERSION defines the project version for the bundle.
 # Update this value when you upgrade the version of your project.
@@ -101,6 +107,19 @@ manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and Cust
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
+.PHONY: lint
+lint: golangci-lint
+	$(GOLANGCILINT) run ./...
+
+
+.PHONY: helm-template
+helm-template: manifests kustomize
+	$(KUSTOMIZE) build config/default | go run helm/gen.go
+
+.PHONY: helm-lint
+helm-lint: helm helm-template
+	cd helm && $(HELM) lint ipfs-operator
+
 .PHONY: fmt
 fmt: ## Run go fmt against code.
 	go fmt ./...
@@ -110,7 +129,7 @@ vet: ## Run go vet against code.
 	go vet ./...
 
 .PHONY: test
-test: manifests generate fmt vet envtest ## Run tests.
+test: lint manifests generate fmt vet lint helm-lint envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test ./... -coverprofile cover.out
 
 .PHONY: test-e2e
@@ -129,7 +148,7 @@ run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./main.go
 
 .PHONY: docker-build
-docker-build: test ## Build docker image with the manager.
+docker-build: ## Build docker image with the manager.
 	docker build -t ${IMG} .
 
 .PHONY: docker-push
@@ -183,10 +202,30 @@ $(KUSTOMIZE): $(LOCALBIN)
 	GOBIN=$(LOCALBIN) go install sigs.k8s.io/kustomize/kustomize/$(KUSTOMIZE_MAJOR)@$(KUSTOMIZE_VERSION)
 	@ echo "✅ Done"
 
-ENVTEST = $(LOCALBIN)/setup-envtest
+.PHONY: helm
+HELM := $(LOCALBIN)/helm
+HELM_URL := https://get.helm.sh/helm-$(HELM_VERSION)-$(OS)-$(ARCH).tar.gz
+helm: $(HELM)
+$(HELM): $(LOCALBIN)
+	@ echo "📥 Downloading helm"
+	curl -sSL "$(HELM_URL)" | tar xzf - -C $(LOCALBIN) --strip-components=1 --wildcards '*/helm'
+	@ echo "✅ Done"
+
+
+.PHONY: golangci-lint
+GOLANGCILINT := $(LOCALBIN)/golangci-lint
+GOLANGCI_URL := https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh
+golangci-lint: $(GOLANGCILINT) ## Download golangci-lint
+$(GOLANGCILINT): $(LOCALBIN)
+	@ echo "📥 Downloading helm"
+	curl -sSfL $(GOLANGCI_URL) | sh -s -- -b $(LOCALBIN) $(GOLANGCI_VERSION)
+	@ echo "✅ Done"
+
 .PHONY: envtest
-envtest: ## Download envtest-setup locally if necessary.
-	$(call go-get-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest@latest)
+ENVTEST = $(LOCALBIN)/setup-envtest
+envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
+$(ENVTEST): $(LOCALBIN)
+	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
 
 # go-get-tool will 'go get' any package $2 and install it to $1.
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
@@ -272,5 +311,4 @@ endef
 KUTTL := $(PROJECT_DIR)/bin/kuttl
 KUTTL_URL := https://github.com/kudobuilder/kuttl/releases/download/v$(KUTTL_VERSION)/kubectl-kuttl_$(KUTTL_VERSION)_linux_x86_64
 kuttl: ## Download kuttl
-	 $(call download-tool,$(KUTTL),$(KUTTL_URL))
- 
+	$(call download-tool,$(KUTTL),$(KUTTL_URL))

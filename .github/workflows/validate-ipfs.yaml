@@ -7,13 +7,11 @@ on:
     branches: ["main", "release*"]
 
 env:
-  GO_VERSION: "1.17"
+  GO_VERSION: "1.18"
   GO111MODULE: "on"
   OPERATOR_IMAGE: "quay.io/redhat-et-ipfs/ipfs-operator"
   BUNDLE_IMAGE: "quay.io/redhat-et-ipfs/ipfs-operator-bundle"
-  TAG: v0.0.1
-  CLUSTER_IMAGE: "quay.io/redhat-et-ipfs/cluster"
-  CLUSTER_VERSION: v1.0.0
+  TAG: "v0.0.1"
 
 
 jobs:
@@ -34,15 +32,15 @@ jobs:
         run: make test
 
       - name: Build operator container
-        run: make docker-build IMG=${OPERATOR_IMAGE}:${TAG}
+        run: make docker-build IMG="${OPERATOR_IMAGE}"
 
       - name: Export container image
-        run: docker save -o /tmp/operator.tar ${OPERATOR_IMAGE}:${TAG}
+        run: docker save -o /tmp/operator.tar ${OPERATOR_IMAGE}
 
       - name: Save container as artifact
         uses: actions/upload-artifact@v1
         with:
-          name: ipfs-operator
+          name: ipfs-cluster-operator
           path: /tmp/operator.tar
 
   build-bundle:
@@ -78,31 +76,9 @@ jobs:
           name: operator-bundle
           path: /tmp/bundle.tar
 
-  cluster:
-    name: build cluster image
-    runs-on: ubuntu-20.04
-    steps: 
-    - uses: actions/checkout@v2
-      with:
-        repository: ipfs/ipfs-cluster
-        ref: ${{ env.CLUSTER_VERSION }}
-
-    - name: podman build
-      run: |
-        podman build -t ${{ env.CLUSTER_IMAGE }}:${{ env.CLUSTER_VERSION }} .
-
-    - name: save the image
-      run: podman save -o /tmp/cluster.tar ${{ env.CLUSTER_IMAGE }}:${{ env.CLUSTER_VERSION }}
-
-    - name: archive the image
-      uses: actions/upload-artifact@v1
-      with:
-        name: cluster
-        path: /tmp/cluster.tar  
-
-  deploy:
-    name: Deploy Kind cluster and run tests
-    needs: [ build-bundle, build-operator, cluster ]
+  e2e:
+    name: End-to-end tests
+    needs: [ build-bundle, build-operator ]
     runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v2
@@ -112,7 +88,8 @@ jobs:
         curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
         sudo install ./kubectl /usr/local/bin/
         kubectl version --short --client
-    
+
+
     - name: Install the Kind binary
       run: |
         curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.12.0/kind-linux-amd64
@@ -121,63 +98,37 @@ jobs:
         kind version
         
     - name: Create a Kind Cluster
-      run: kind create cluster
+      run: ./hack/setup-kind-cluster.sh
 
     - name: Pull the Container Image from Artifacts
       uses: actions/download-artifact@v1
       with:
-        name: operator-bundle
+        name: ipfs-cluster-operator
         path: /tmp
 
     - name: Load the Container Image
-      run: docker load -i /tmp/bundle.tar
-
-    - name: Load the Container Image into Kind
-      run: kind load docker-image ${BUNDLE_IMAGE}:${TAG}
-
-    - name: Pull the Container Image from Artifacts
-      uses: actions/download-artifact@v1
-      with:
-        name: ipfs-operator
-        path: /tmp
-
-    - name: Load the Container Image
-      run: docker load -i /tmp/operator.tar
-
-    - name: Load the Container Image into Kind
-      run: kind load docker-image ${OPERATOR_IMAGE}:${TAG}
-
-    - name: Pull the Container Image from Artifacts
-      uses: actions/download-artifact@v1
-      with:
-        name: cluster
-        path: /tmp
-
-    - name: Load the Container Image
-      run: docker load -i /tmp/cluster.tar
-
-    - name: Load the Container Image into Kind
-      run: kind load docker-image ${CLUSTER_IMAGE}:${CLUSTER_VERSION}
-
-    - name: Install operator-sdk
       run: |
-        curl -L -o operator-sdk https://github.com/operator-framework/operator-sdk/releases/download/v1.11.0/operator-sdk_linux_amd64
-        sudo install ./operator-sdk /usr/local/bin && rm operator-sdk
+        docker load -i /tmp/operator.tar
+        docker inspect ${OPERATOR_IMAGE}
+        docker tag ${OPERATOR_IMAGE} ${OPERATOR_IMAGE}:ci-build
+        kind load docker-image ${OPERATOR_IMAGE}:ci-build
 
-    - name: Install the operator
+    - name: Load the Operator into Kind
       run: |
-        make bundle
-        kubectl create ns ipfs-operator-system
-        make deploy
-        kubectl get events -n ipfs-operator-system
-        kubectl get po -A
+        helm upgrade --install \
+          --debug \
+          --set image.tag="ci-build" \
+          --wait --timeout=300s \
+          ipfs-cluster ./helm/ipfs-operator
 
     - name: run e2e tests
-      run: make test-e2e
+      run: |
+        mkdir bin
+        make test-e2e
 
   push-operator:
     name: Push operator container to registry
-    needs: deploy
+    needs: e2e
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
@@ -186,13 +137,13 @@ jobs:
       - name: Pull the Container Image from Artifacts
         uses: actions/download-artifact@v1
         with:
-          name: ipfs-operator
+          name: ipfs-cluster-operator
           path: /tmp
 
       - name: Load the Container Image
         run: |
           docker load -i /tmp/operator.tar
-          docker inspect ${OPERATOR_IMAGE}:${TAG}
+          docker inspect ${OPERATOR_IMAGE}
 
       - name: Login to registry
         # If the registry server is specified in the image name, we use that.
@@ -206,11 +157,12 @@ jobs:
           (github.event_name == 'push' || github.event_name == 'schedule') &&
           github.ref == 'refs/heads/main'
         run: |
+          docker tag ${OPERATOR_IMAGE} ${OPERATOR_IMAGE}:${TAG}
           docker push "${OPERATOR_IMAGE}:${TAG}"
 
   push-bundle:
     name: Push bundle container to registry
-    needs: deploy
+    needs: e2e
     if: >
       (github.event_name == 'push' || github.event_name == 'schedule') &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
@@ -227,7 +179,7 @@ jobs:
         run: |
           docker load -i /tmp/bundle.tar
           docker inspect "${BUNDLE_IMAGE}:${{ env.TAG }}"
-          
+
       - name: Login to registry
         # If the registry server is specified in the image name, we use that.
         # If the server isn't in the image name, default to docker.io
@@ -243,39 +195,3 @@ jobs:
         run: |
           echo "Pushing to ${{ env.TAG }}"
           docker push "${BUNDLE_IMAGE}:${{ env.TAG }}"
-
-  push-cluster:
-    name: Push cluster image to registry
-    needs: deploy
-    if: >
-      (github.event_name == 'push' || github.event_name == 'schedule') &&
-      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
-    runs-on: ubuntu-20.04
-
-    steps:
-      - name: Load container artifact
-        uses: actions/download-artifact@v1
-        with:
-          name: cluster
-          path: /tmp
-
-      - name: Import container image
-        run: |
-          docker load -i /tmp/cluster.tar
-          docker inspect "${CLUSTER_IMAGE}:${{ env.CLUSTER_VERSION }}"
-          
-      - name: Login to registry
-        # If the registry server is specified in the image name, we use that.
-        # If the server isn't in the image name, default to docker.io
-        run: |
-          [[ "${BUNDLE_IMAGE}" =~ ^([^/]+)/[^/]+/[^/]+ ]] && REGISTRY="${BASH_REMATCH[1]}" || REGISTRY="docker.io"
-          echo "Attempting docker login to: ${REGISTRY}"
-          echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login -u "${{ secrets.REGISTRY_USERNAME }}" --password-stdin ${REGISTRY}
-          
-      - name: Push to registry (version tag)
-        if: >
-          (github.event_name == 'push' || github.event_name == 'schedule') &&
-          github.ref == 'refs/heads/main'
-        run: |
-          echo "Pushing to ${CLUSTER_IMAGE}:${{ env.CLUSTER_VERSION }}"
-          docker push "${CLUSTER_IMAGE}:${{ env.CLUSTER_VERSION }}"

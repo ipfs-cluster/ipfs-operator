@@ -1,0 +1,11 @@
+# This helm chart has no configurable options at the moment.
+# This will change in the future.
+#
+# To re-generate this helm chart, run `make helm-template`
+
+# image defines the main controller image to be used for the manager container.
+image:
+  repository: quay.io/redhat-et-ipfs/ipfs-operator 
+  pullPolicy: IfNotPresent
+  # tag value or the default
+  tag: ""

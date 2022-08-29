@@ -1,0 +1,4 @@
+[project]
+name = "IPFS operator"
+authors = [{name = "IPFS Operator dev team", email = ""}]
+dynamic = ["version", "description"]

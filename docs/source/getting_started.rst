@@ -5,10 +5,6 @@ This document explains methods that can be used to install the operator onto an 
 
 No matter which method you choose, the same operator will be installed.
 
-**With OLM**
-::
-operator-sdk run bundle quay.io/redhat-et-ipfs/ipfs-operator-bundle:v0.0.1 -n ipfs-operator-system
-
 **With helm**
 ::
 helm install ipfs-operator ./helm/ipfs-operator

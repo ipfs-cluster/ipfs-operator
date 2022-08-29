@@ -23,7 +23,7 @@ import (
 // customize the startup of the IPFS containers depending on the values from the given IPFS cluster resource.
 func (r *IpfsReconciler) configMapScripts(
 	ctx context.Context,
-	m *clusterv1alpha1.Ipfs,
+	m *clusterv1alpha1.IpfsCluster,
 	cm *corev1.ConfigMap,
 ) (controllerutil.MutateFn, string) {
 	log := ctrllog.FromContext(ctx)

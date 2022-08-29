@@ -10,7 +10,7 @@ import (
 )
 
 func (r *IpfsReconciler) configMapConfig(
-	m *clusterv1alpha1.Ipfs,
+	m *clusterv1alpha1.IpfsCluster,
 	cm *corev1.ConfigMap,
 	peerid string,
 ) (controllerutil.MutateFn, string) {

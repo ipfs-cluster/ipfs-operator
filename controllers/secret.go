@@ -10,7 +10,7 @@ import (
 )
 
 func (r *IpfsReconciler) secretConfig(
-	m *clusterv1alpha1.Ipfs,
+	m *clusterv1alpha1.IpfsCluster,
 	sec *corev1.Secret,
 	clusterSecret,
 	bootstrapPrivateKey []byte,

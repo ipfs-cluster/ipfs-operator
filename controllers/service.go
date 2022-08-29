@@ -11,7 +11,7 @@ import (
 )
 
 func (r *IpfsReconciler) serviceCluster(
-	m *clusterv1alpha1.Ipfs,
+	m *clusterv1alpha1.IpfsCluster,
 	svc *corev1.Service,
 ) (controllerutil.MutateFn, string) {
 	svcName := "ipfs-cluster-" + m.Name

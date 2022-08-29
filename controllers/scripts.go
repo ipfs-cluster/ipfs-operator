@@ -19,9 +19,9 @@ import (
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-// configMapScripts Returns a mutate function which loads the given configMap with scripts that
+// ConfigMapScripts Returns a mutate function which loads the given configMap with scripts that
 // customize the startup of the IPFS containers depending on the values from the given IPFS cluster resource.
-func (r *IpfsReconciler) configMapScripts(
+func (r *IpfsReconciler) ConfigMapScripts(
 	ctx context.Context,
 	m *clusterv1alpha1.Ipfs,
 	cm *corev1.ConfigMap,

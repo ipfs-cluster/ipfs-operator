@@ -129,8 +129,9 @@ vet: ## Run go vet against code.
 	go vet ./...
 
 .PHONY: test
-test: lint manifests generate fmt vet lint helm-lint envtest ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test ./... -coverprofile cover.out
+GINKGO_ARGS ?= -outputdir . -cover -coverprofile cover.out -progress
+test: lint manifests generate fmt vet lint helm-lint envtest ginkgo ## Run tests.
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GINKGO) $(GINKGO_ARGS) ./...
 
 .PHONY: test-e2e
 test-e2e: kuttl ## Run e2e tests. Requires cluster w/ Scribe already installed
@@ -194,32 +195,6 @@ $(CONTROLLER_GEN): $(LOCALBIN)
 	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION)
 	@ echo "✅ Done"
 
-.PHONY: kustomize
-KUSTOMIZE = $(LOCALBIN)/kustomize
-kustomize: $(KUSTOMIZE)## Download kustomize locally if necessary.
-$(KUSTOMIZE): $(LOCALBIN)
-	@ echo "📥 Downloading kustomize"
-	GOBIN=$(LOCALBIN) go install sigs.k8s.io/kustomize/kustomize/$(KUSTOMIZE_MAJOR)@$(KUSTOMIZE_VERSION)
-	@ echo "✅ Done"
-
-.PHONY: helm
-HELM := $(LOCALBIN)/helm
-HELM_URL := https://get.helm.sh/helm-$(HELM_VERSION)-$(OS)-$(ARCH).tar.gz
-helm: $(HELM)
-$(HELM): $(LOCALBIN)
-	@ echo "📥 Downloading helm"
-	curl -sSL "$(HELM_URL)" | tar xzf - -C $(LOCALBIN) --strip-components=1 --wildcards '*/helm'
-	@ echo "✅ Done"
-
-
-.PHONY: golangci-lint
-GOLANGCILINT := $(LOCALBIN)/golangci-lint
-GOLANGCI_URL := https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh
-golangci-lint: $(GOLANGCILINT) ## Download golangci-lint
-$(GOLANGCILINT): $(LOCALBIN)
-	@ echo "📥 Downloading helm"
-	curl -sSfL $(GOLANGCI_URL) | sh -s -- -b $(LOCALBIN) $(GOLANGCI_VERSION)
-	@ echo "✅ Done"
 
 .PHONY: envtest
 ENVTEST = $(LOCALBIN)/setup-envtest
@@ -297,18 +272,65 @@ catalog-build: opm ## Build a catalog image.
 catalog-push: ## Push a catalog image.
 	$(MAKE) docker-push IMG=$(CATALOG_IMG)
 
+
+##@ Download Utilities
+
 # download-tool will curl any file $2 and install it to $1.
 define download-tool
 @[ -f $(1) ] || { \
 set -e ;\
-echo "Downloading $(2)" ;\
+echo "📥 Downloading $(2)" ;\
 curl -sSLo "$(1)" "$(2)" ;\
 chmod a+x "$(1)" ;\
+echo "✅ Done" ;\
 }
 endef
 
+# install-go-tool will download any $2 URL and install to $1
+define install-go-tool
+@[ -f $(1) ] || { \
+set -e ;\
+echo "📥 Downloading $(2)" ;\
+GOBIN=$(1) go install $(2) ;\
+echo "✅ Done" ;\
+}
+endef
+
+
 .PHONY: kuttl
-KUTTL := $(PROJECT_DIR)/bin/kuttl
+KUTTL := $(LOCALBIN)/kuttl
 KUTTL_URL := https://github.com/kudobuilder/kuttl/releases/download/v$(KUTTL_VERSION)/kubectl-kuttl_$(KUTTL_VERSION)_linux_x86_64
 kuttl: ## Download kuttl
 	$(call download-tool,$(KUTTL),$(KUTTL_URL))
+
+.PHONY: ginkgo
+GINKGO := $(LOCALBIN)/ginkgo
+GINKGO_URL := github.com/onsi/ginkgo/v2/ginkgo
+ginkgo: $(GINKGO) ## Install ginkgo
+$(GINKGO): $(LOCALBIN)
+	$(call install-go-tool,$(LOCALBIN),$(GINKGO_URL))
+
+
+.PHONY: kustomize
+KUSTOMIZE = $(LOCALBIN)/kustomize
+KUSTOMIZE_URL := sigs.k8s.io/kustomize/kustomize/$(KUSTOMIZE_MAJOR)@$(KUSTOMIZE_VERSION)
+kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
+$(KUSTOMIZE): $(LOCALBIN)
+	$(call install-go-tool,$(LOCALBIN),$(KUSTOMIZE_URL))
+
+.PHONY: helm
+HELM := $(LOCALBIN)/helm
+HELM_URL := https://get.helm.sh/helm-$(HELM_VERSION)-$(OS)-$(ARCH).tar.gz
+helm: $(HELM) ## Install helm
+$(HELM): $(LOCALBIN)
+	$(call download-tool,$(HELM),$(HELM_URL))
+
+
+.PHONY: golangci-lint
+GOLANGCILINT := $(LOCALBIN)/golangci-lint
+GOLANGCI_URL := https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh
+golangci-lint: $(GOLANGCILINT) ## Download golangci-lint
+$(GOLANGCILINT): $(LOCALBIN)
+	@ echo "📥 Downloading helm"
+	curl -sSfL $(GOLANGCI_URL) | sh -s -- -b $(LOCALBIN) $(GOLANGCI_VERSION)
+	@ echo "✅ Done"

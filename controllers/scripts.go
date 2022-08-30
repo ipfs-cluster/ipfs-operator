@@ -19,6 +19,15 @@ import (
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
+const (
+	// ScriptConfigureIPFS Defines the script run by the IPFS containers
+	// in order to initialize their state.
+	ScriptConfigureIPFS = "configure-ipfs.sh"
+	// ScriptIPFSClusterEntryPoint Defines a shell script used as the entrypoint
+	// for the IPFS Cluster container.
+	ScriptIPFSClusterEntryPoint = "entrypoint.sh"
+)
+
 // ConfigMapScripts Returns a mutate function which loads the given configMap with scripts that
 // customize the startup of the IPFS containers depending on the values from the given IPFS cluster resource.
 func (r *IpfsReconciler) ConfigMapScripts(

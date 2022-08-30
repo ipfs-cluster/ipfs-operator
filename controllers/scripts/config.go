@@ -5,12 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"os"
 	"strconv"
 	"text/template"
 
 	"github.com/alecthomas/units"
-	"github.com/ipfs/interface-go-ipfs-core/options"
 	"github.com/ipfs/kubo/config"
 	"github.com/libp2p/go-libp2p-core/peer"
 )
@@ -18,6 +16,24 @@ import (
 type configureIpfsOpts struct {
 	FlattenedConfig string
 }
+
+/*
+
+ 2 nodes
+ key 1 - pk 1 => ipfs-1
+ key 2 - pk 2 => ipfs-2
+
+ secret{
+	ipfs-1: <data>
+	ipfs-2: <data>
+	...
+ }
+
+ container{
+	ipfs1 mounts secret, pulls ipfs-1
+ }
+
+*/
 
 const (
 	configureIpfs = `
@@ -28,6 +44,11 @@ user=ipfs
 # This is a custom entrypoint for k8s designed to run ipfs nodes in an appropriate
 # setup for production scenarios.
 
+INDEX="${HOSTNAME##*-}"
+
+PRIVATE_KEY=$(cat "/node-data/privateKey-${INDEX}")
+PEER_ID=$(cat "/node-data/peerID-${INDEX}")
+
 if [[ -f /data/ipfs/config ]]; then
 	if [[ -f /data/ipfs/repo.lock ]]; then
 		rm /data/ipfs/repo.lock
@@ -36,6 +57,9 @@ if [[ -f /data/ipfs/config ]]; then
 fi
 
 echo '{{ .FlattenedConfig }}' > config.json
+sed -i s/_peer-id_/"${PEER_ID}"/g
+sed -i s/_private-key_/"${PRIVATE_KEY}"/g
+
 ipfs init -- config.json
 
 chown -R ipfs: /data/ipfs
@@ -241,17 +265,13 @@ func createTemplateConfig(
 	rc config.RelayClient,
 ) (conf config.Config, err error) {
 	// attempt to generate an identity
-	var identity config.Identity
 
-	// try to generate an elliptic curve key first
-	identity, err = config.CreateIdentity(os.Stdout, []options.KeyGenerateOption{
-		options.Key.Type(options.Ed25519Key),
-	})
 	if err != nil {
 		return
 	}
 	// set keys + defaults
-	conf.Identity = identity
+	conf.Identity.PeerID = "_peer-id_"
+	conf.Identity.PrivKey = "_private-key_"
 
 	// apply the server + flatfs profiles
 	if err = applyFlatfsServer(&conf); err != nil {

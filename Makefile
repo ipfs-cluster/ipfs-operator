@@ -129,9 +129,9 @@ vet: ## Run go vet against code.
 	go vet ./...
 
 .PHONY: test
-GINKGO_ARGS ?= -r --progress --randomize-all --randomize-suites --fail-on-pending --keep-going --cover --coverprofile=cover.profile --race --trace --json-report=report.json --timeout=30s
+GINKGO_ARGS ?= --progress --fail-on-pending --keep-going --cover --coverprofile=cover.profile --race --trace --json-report=report.json --timeout=3m
 test: lint manifests generate fmt vet lint envtest ginkgo ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GINKGO) $(GINKGO_ARGS) ./...
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GINKGO) run $(GINKGO_ARGS) ./...
 
 .PHONY: test-e2e
 test-e2e: kuttl ## Run e2e tests. Requires cluster w/ Scribe already installed

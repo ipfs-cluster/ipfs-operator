@@ -20,7 +20,16 @@ const (
 	privateKeyPrefix = "privateKey-"
 )
 
+// errorFunc Returns a function which returns the provided
+// error when it is called.
+func errorFunc(err error) controllerutil.MutateFn {
+	return func() error {
+		return err
+	}
+}
+
 func (r *IpfsReconciler) secretConfig(
+	ctx context.Context,
 	m *clusterv1alpha1.Ipfs,
 	sec *corev1.Secret,
 	clusterSecret,
@@ -35,18 +44,19 @@ func (r *IpfsReconciler) secretConfig(
 		},
 	}
 	// find secret
-	err := r.Get(context.Background(), client.ObjectKeyFromObject(expectedSecret), expectedSecret)
+	err := r.Get(ctx, client.ObjectKeyFromObject(expectedSecret), expectedSecret)
 	if err != nil && !errors.IsNotFound(err) {
-		return func() error {
-			return err
-		}, ""
+		return errorFunc(err), ""
 	}
 	// initialize the secret, if needed
 	if err != nil && errors.IsNotFound(err) {
 		expectedSecret.Data = make(map[string][]byte, 0)
 		expectedSecret.StringData = make(map[string]string, 0)
 		// secret doesn't exist
-		generateNewIdentities(expectedSecret, 0, m.Spec.Replicas)
+		err = generateNewIdentities(expectedSecret, 0, m.Spec.Replicas)
+		if err != nil {
+			return errorFunc(err), ""
+		}
 		expectedSecret.Data["CLUSTER_SECRET"] = clusterSecret
 		expectedSecret.Data["BOOTSTRAP_PEER_PRIV_KEY"] = bootstrapPrivateKey
 	}
@@ -58,14 +68,17 @@ func (r *IpfsReconciler) secretConfig(
 		// when scaling down and then up again
 		if int(numIdentities) < int(m.Spec.Replicas) {
 			// create more
-			generateNewIdentities(expectedSecret, numIdentities, m.Spec.Replicas)
+			err = generateNewIdentities(expectedSecret, numIdentities, m.Spec.Replicas)
+			if err != nil {
+				return errorFunc(err), ""
+			}
 		}
 	}
 
 	expectedSecret.DeepCopyInto(sec)
 	// FIXME: catch this error before we run the function being returned
-	if err := ctrl.SetControllerReference(m, sec, r.Scheme); err != nil {
-		return func() error { return err }, ""
+	if err = ctrl.SetControllerReference(m, sec, r.Scheme); err != nil {
+		return errorFunc(err), ""
 	}
 	return func() error {
 		sec.Data = expectedSecret.Data
@@ -75,7 +88,7 @@ func (r *IpfsReconciler) secretConfig(
 
 // countIdentities Counts the amount of unique peer identities present in the secret.
 func countIdentities(secret *corev1.Secret) int32 {
-	var count int32 = 0
+	var count int32
 	for key := range secret.Data {
 		if strings.Contains(key, peerIDPrefix) {
 			count++

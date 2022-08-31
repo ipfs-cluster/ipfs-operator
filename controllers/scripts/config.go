@@ -17,24 +17,6 @@ type configureIpfsOpts struct {
 	FlattenedConfig string
 }
 
-/*
-
- 2 nodes
- key 1 - pk 1 => ipfs-1
- key 2 - pk 2 => ipfs-2
-
- secret{
-	ipfs-1: <data>
-	ipfs-2: <data>
-	...
- }
-
- container{
-	ipfs1 mounts secret, pulls ipfs-1
- }
-
-*/
-
 const (
 	configureIpfs = `
 #!/bin/sh
@@ -266,9 +248,6 @@ func createTemplateConfig(
 ) (conf config.Config, err error) {
 	// attempt to generate an identity
 
-	if err != nil {
-		return
-	}
 	// set keys + defaults
 	conf.Identity.PeerID = "_peer-id_"
 	conf.Identity.PrivKey = "_private-key_"

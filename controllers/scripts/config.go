@@ -57,8 +57,8 @@ if [[ -f /data/ipfs/config ]]; then
 fi
 
 echo '{{ .FlattenedConfig }}' > config.json
-sed -i s/_peer-id_/"${PEER_ID}"/g
-sed -i s/_private-key_/"${PRIVATE_KEY}"/g
+sed -i s,_peer-id_,"${PEER_ID}",g config.json
+sed -i s,_private-key_,"${PRIVATE_KEY}",g config.json
 
 ipfs init -- config.json
 

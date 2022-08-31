@@ -129,7 +129,7 @@ vet: ## Run go vet against code.
 	go vet ./...
 
 .PHONY: test
-GINKGO_ARGS ?= -r --procs=4 --compilers=2 --randomize-all --randomize-suites --fail-on-pending --keep-going --cover --coverprofile=cover.profile --race --trace --json-report=report.json --timeout=30s
+GINKGO_ARGS ?= -r --progress --randomize-all --randomize-suites --fail-on-pending --keep-going --cover --coverprofile=cover.profile --race --trace --json-report=report.json --timeout=30s
 test: lint manifests generate fmt vet lint envtest ginkgo ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GINKGO) $(GINKGO_ARGS) ./...
 

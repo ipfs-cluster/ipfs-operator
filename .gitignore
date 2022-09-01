@@ -6,6 +6,7 @@
 *.so
 *.dylib
 bin
+!docs/build/
 docs/build/*
 testbin/*
 

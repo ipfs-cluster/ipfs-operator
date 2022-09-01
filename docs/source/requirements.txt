@@ -1,0 +1,7 @@
+mypy
+plantweb
+pylint
+rstcheck
+sphinx_rtd_theme
+sphinx-tabs
+sphinx-toolbox

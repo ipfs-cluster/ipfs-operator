@@ -6,12 +6,17 @@ This document explains methods that can be used to install the operator onto an 
 No matter which method you choose, the same operator will be installed.
 
 **With helm**
-::
-helm install ipfs-operator ./helm/ipfs-operator
+
+
+.. code-block:: bash
+   
+   helm install ipfs-operator ./helm/ipfs-operator
 
 **manually**
-::
-make install
+
+.. code-block:: bash
+
+   make install
 
 
 

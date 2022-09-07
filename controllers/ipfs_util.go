@@ -40,7 +40,7 @@ func generateIdentity() (peer.ID, string, error) {
 	if err != nil {
 		return "", "", fmt.Errorf("cannot generate new key: %w", err)
 	}
-	privBytes, err := crypto.MarshalPrivateKey(priv)
+	privBytes, err := ci.MarshalPrivateKey(priv)
 	if err != nil {
 		return "", "", fmt.Errorf("cannot get bytes from private key: %w", err)
 	}

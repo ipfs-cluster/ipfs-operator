@@ -15,6 +15,8 @@ testbin/*
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
+*.profile
+profile.json
 
 # Kubernetes Generated files - skip generated files, except for vendored files
 

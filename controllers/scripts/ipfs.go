@@ -203,6 +203,7 @@ func setFlatfsShardFunc(conf *config.Config, n uint8) error {
 // applyIPFSClusterK8sDefaults Applies settings to the given Kubo configuration
 // which are customized specifically for running within a Kubernetes cluster.
 func applyIPFSClusterK8sDefaults(conf *config.Config, storageMax string, peers []peer.AddrInfo, rc config.RelayClient) {
+	conf.Bootstrap = config.DefaultBootstrapAddresses
 	conf.Addresses.API = config.Strings{"/ip4/0.0.0.0/tcp/5001"}
 	conf.Addresses.Gateway = config.Strings{"/ip4/0.0.0.0/tcp/8080"}
 	conf.Swarm.ConnMgr.HighWater = 2000

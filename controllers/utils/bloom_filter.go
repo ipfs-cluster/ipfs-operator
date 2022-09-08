@@ -1,6 +1,10 @@
 package utils
 
-import "math"
+import (
+	"math"
+
+	"github.com/alecthomas/units"
+)
 
 // CalculateBloomFilterSize Accepts the size of the IPFS storage in bytes
 // and returns the bloom filter size to be used in bytes.
@@ -9,13 +13,15 @@ import "math"
 // https://github.com/redhat-et/ipfs-operator/issues/35#issue-1320941289
 func CalculateBloomFilterSize(ipfsStorage int64) int64 {
 	// 256KiB
-	const blockSize = 262144
+	const blockSize = 256 * units.Kibibyte
 	// number of blocks
-	var n, m int64
+	var m int64
 	// false-negative rate, 1 / 1000
 	var p = 0.001
 
-	n = ipfsStorage / blockSize
+	ipfsStorageAsBytes := units.Base2Bytes(ipfsStorage)
+
+	n := ipfsStorageAsBytes / blockSize
 
 	// formula based on bloom filter calculator:
 	// https://hur.st/bloomfilter

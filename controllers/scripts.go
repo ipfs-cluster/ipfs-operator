@@ -5,10 +5,10 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	"github.com/alecthomas/units"
 	"github.com/ipfs/kubo/config"
 	"github.com/libp2p/go-libp2p-core/peer"
 	ma "github.com/multiformats/go-multiaddr"
@@ -37,7 +37,6 @@ func (r *IpfsReconciler) ConfigMapScripts(
 	cm *corev1.ConfigMap,
 ) (controllerutil.MutateFn, string) {
 	var err error
-	var parsedQuantity resource.Quantity
 	log := ctrllog.FromContext(ctx)
 
 	relayPeers, err := r.getCircuitInfo(ctx, m)
@@ -63,13 +62,18 @@ func (r *IpfsReconciler) ConfigMapScripts(
 
 	cmName := "ipfs-cluster-scripts-" + m.Name
 	var storageMaxGB string
-	parsedQuantity, err = resource.ParseQuantity(m.Spec.IpfsStorage)
+	ipfsStorage := m.Spec.IpfsStorage
 	if err != nil {
 		return utils.ErrFunc(err), ""
 	}
 
-	maxStorage := MaxIPFSStorage(parsedQuantity)
-	bloomFilterSize := utils.CalculateBloomFilterSize(maxStorage.AsDec().UnscaledBig().Int64())
+	// compute storage sizes of IPFS volumes
+	sizei64, ok := m.Spec.IpfsStorage.AsInt64()
+	if !ok {
+		sizei64 = ipfsStorage.ToDec().Value()
+	}
+	maxStorage := MaxIPFSStorage(sizei64)
+	bloomFilterSize := utils.CalculateBloomFilterSize(maxStorage)
 	if err != nil {
 		return func() error {
 			return err
@@ -149,18 +153,15 @@ func (r *IpfsReconciler) getCircuitInfo(
 
 // MaxIPSStorage Accepts a storage quantity and returns with a
 // calculated value to be used for setting the Max IPFS storage value
-// in Gigabytes.
-func MaxIPFSStorage(ipfsStorage resource.Quantity) resource.Quantity {
-	var storageMaxGB resource.Quantity
-	sizei64, _ := ipfsStorage.AsInt64()
-	sizeGB := sizei64 / 1024 / 1024 / 1024
-	var reducedSize int64
+// in bytes.
+func MaxIPFSStorage(ipfsStorage int64) (storageMaxGB int64) {
+	sizeGB := units.Base2Bytes(ipfsStorage) / units.Gibibyte
+	var reducedSize units.Base2Bytes
 	// if the disk is big, use a bigger percentage of it.
 	if sizeGB > 1024*8 {
 		reducedSize = sizeGB * 9 / 10
 	} else {
 		reducedSize = sizeGB * 8 / 10
 	}
-	storageMaxGB = *resource.NewQuantity(reducedSize, "G")
-	return storageMaxGB
+	return int64(reducedSize)
 }

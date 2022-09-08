@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -42,13 +43,13 @@ type networkConfig struct {
 
 type IpfsSpec struct {
 	// +kubebuilder:validation:Optional
-	URL            string         `json:"url"`
-	Public         bool           `json:"public"`
-	IpfsStorage    string         `json:"ipfsStorage"`
-	ClusterStorage string         `json:"clusterStorage"`
-	Replicas       int32          `json:"replicas"`
-	Networking     networkConfig  `json:"networking"`
-	Follows        []followParams `json:"follows"`
+	URL            string            `json:"url"`
+	Public         bool              `json:"public"`
+	IpfsStorage    resource.Quantity `json:"ipfsStorage"`
+	ClusterStorage string            `json:"clusterStorage"`
+	Replicas       int32             `json:"replicas"`
+	Networking     networkConfig     `json:"networking"`
+	Follows        []followParams    `json:"follows"`
 }
 
 type IpfsStatus struct {

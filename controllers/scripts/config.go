@@ -188,7 +188,7 @@ func applyFlatfsServer(conf *config.Config) error {
 
 // setFlatfsShardFunc Attempts to update the given flatfs configuration to use a shardFunc
 // with the given `n`. If unsuccessful, false will be returned.
-func setFlatfsShardFunc(conf *config.Config, n uint8) error {
+func setFlatfsShardFunc(conf *config.Config, n int8) error {
 	// we want to use next-to-last/3 as the sharding function
 	// as per this issue:
 	// https://github.com/redhat-et/ipfs-operator/issues/32
@@ -216,7 +216,7 @@ func setFlatfsShardFunc(conf *config.Config, n uint8) error {
 			continue
 		}
 		if dsType == "flatfs" {
-			child["shardFunc"] = "/repo/flatfs/shard/v1/next-to-last/" + strconv.FormatUint(uint64(n), 10)
+			child["shardFunc"] = "/repo/flatfs/shard/v1/next-to-last/" + strconv.FormatInt(int64(n), 10)
 			break
 		}
 	}

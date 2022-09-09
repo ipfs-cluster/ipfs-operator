@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"strconv"
 	"text/template"
 
+	"github.com/alecthomas/units"
 	"github.com/ipfs/interface-go-ipfs-core/options"
 	"github.com/ipfs/kubo/config"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -123,6 +125,15 @@ for op in "${@}"; do
 	esac
 done
 `
+)
+
+const (
+	// BloomFalsePositiveRate Defines the probability of the bloom filter detecting a given value
+	// as being stored.
+	BloomFalsePositiveRate float64 = 0.001
+	// BloomBlockSize Defines the size of blocks used by the bloom filter. This value is the denominator
+	// when determining n = (total size) / (size of blocks).
+	BloomBlockSize = 256 * units.Kibibyte
 )
 
 // CreateConfigureScript Accepts the given storageMax, peers, and relayClient
@@ -246,4 +257,28 @@ func createTemplateConfig(
 	}
 	applyIPFSClusterK8sDefaults(&conf, storageMax, peers, rc)
 	return
+}
+
+// CalculateBloomFilterSize Accepts the size of the IPFS storage in bytes
+// and returns the bloom filter size to be used in bytes.
+//
+// Computations are done with values based on this issue:
+// https://github.com/redhat-et/ipfs-operator/issues/35#issue-1320941289
+func CalculateBloomFilterSize(ipfsStorage int64) int64 {
+	// formula based on bloom filter calculator:
+	// https://hur.st/bloomfilter
+	var m, p, k, r float64
+	// false-negative rate, 1 / 1000
+	p = BloomFalsePositiveRate
+	// number of hash functions
+	k = 7
+	ipfsStorageAsBytes := units.Base2Bytes(ipfsStorage)
+
+	n := ipfsStorageAsBytes / BloomBlockSize
+	r = float64(-k) / math.Log(1-math.Exp(math.Log(p)/float64(k)))
+	// number of blocks
+	m = math.Ceil(float64(n) * r)
+	// convert from bits -> bytes
+	bloomFilterSizeBytes := int64(math.Ceil(m / 8))
+	return bloomFilterSizeBytes
 }

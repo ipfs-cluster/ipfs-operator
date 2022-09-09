@@ -61,8 +61,9 @@ func (r *IpfsReconciler) ConfigMapScripts(
 	}
 
 	cmName := "ipfs-cluster-scripts-" + m.Name
-	var storageMaxGB string
-	ipfsStorage := m.Spec.IpfsStorage
+
+	// configure storage variables
+	storageMaxGB := m.Spec.IpfsStorage.String()
 	if err != nil {
 		return utils.ErrFunc(err), ""
 	}
@@ -70,10 +71,10 @@ func (r *IpfsReconciler) ConfigMapScripts(
 	// compute storage sizes of IPFS volumes
 	sizei64, ok := m.Spec.IpfsStorage.AsInt64()
 	if !ok {
-		sizei64 = ipfsStorage.ToDec().Value()
+		sizei64 = m.Spec.IpfsStorage.ToDec().Value()
 	}
 	maxStorage := MaxIPFSStorage(sizei64)
-	bloomFilterSize := utils.CalculateBloomFilterSize(maxStorage)
+	bloomFilterSize := scripts.CalculateBloomFilterSize(maxStorage)
 	if err != nil {
 		return func() error {
 			return err

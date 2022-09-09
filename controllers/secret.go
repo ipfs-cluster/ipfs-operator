@@ -66,7 +66,7 @@ func (r *IpfsReconciler) secretConfig(
 	if numIdentities != m.Spec.Replicas {
 		// create more identities if needed, otherwise they will be reused
 		// when scaling down and then up again
-		if int(numIdentities) < int(m.Spec.Replicas) {
+		if numIdentities < m.Spec.Replicas {
 			// create more
 			err = generateNewIdentities(expectedSecret, numIdentities, m.Spec.Replicas)
 			if err != nil {

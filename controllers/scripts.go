@@ -63,7 +63,6 @@ func (r *IpfsReconciler) ConfigMapScripts(
 	cmName := "ipfs-cluster-scripts-" + m.Name
 
 	// configure storage variables
-	storageMaxGB := m.Spec.IpfsStorage.String()
 	if err != nil {
 		return utils.ErrFunc(err), ""
 	}
@@ -74,6 +73,7 @@ func (r *IpfsReconciler) ConfigMapScripts(
 		sizei64 = m.Spec.IpfsStorage.ToDec().Value()
 	}
 	maxStorage := MaxIPFSStorage(sizei64)
+	maxStorageS := fmt.Sprintf("%dB", maxStorage)
 	bloomFilterSize := scripts.CalculateBloomFilterSize(maxStorage)
 	if err != nil {
 		return func() error {
@@ -82,7 +82,7 @@ func (r *IpfsReconciler) ConfigMapScripts(
 	}
 	// get the config script
 	configScript, err := scripts.CreateConfigureScript(
-		storageMaxGB,
+		maxStorageS,
 		relayPeers,
 		relayConfig,
 		bloomFilterSize,
@@ -156,13 +156,12 @@ func (r *IpfsReconciler) getCircuitInfo(
 // calculated value to be used for setting the Max IPFS storage value
 // in bytes.
 func MaxIPFSStorage(ipfsStorage int64) (storageMaxGB int64) {
-	sizeGB := units.Base2Bytes(ipfsStorage) / units.Gibibyte
 	var reducedSize units.Base2Bytes
 	// if the disk is big, use a bigger percentage of it.
-	if sizeGB > 1024*8 {
-		reducedSize = sizeGB * 9 / 10
+	if units.Base2Bytes(ipfsStorage) > units.Tebibyte*8 {
+		reducedSize = units.Base2Bytes(ipfsStorage) * 9 / 10
 	} else {
-		reducedSize = sizeGB * 8 / 10
+		reducedSize = units.Base2Bytes(ipfsStorage) * 8 / 10
 	}
 	return int64(reducedSize)
 }

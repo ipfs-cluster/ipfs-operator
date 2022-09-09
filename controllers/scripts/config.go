@@ -5,12 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"os"
 	"strconv"
 	"text/template"
 
 	"github.com/alecthomas/units"
-	"github.com/ipfs/interface-go-ipfs-core/options"
 	"github.com/ipfs/kubo/config"
 	"github.com/libp2p/go-libp2p-core/peer"
 )
@@ -28,6 +26,11 @@ user=ipfs
 # This is a custom entrypoint for k8s designed to run ipfs nodes in an appropriate
 # setup for production scenarios.
 
+INDEX="${HOSTNAME##*-}"
+
+PRIVATE_KEY=$(cat "/node-data/privateKey-${INDEX}")
+PEER_ID=$(cat "/node-data/peerID-${INDEX}")
+
 if [[ -f /data/ipfs/config ]]; then
 	if [[ -f /data/ipfs/repo.lock ]]; then
 		rm /data/ipfs/repo.lock
@@ -36,6 +39,9 @@ if [[ -f /data/ipfs/config ]]; then
 fi
 
 echo '{{ .FlattenedConfig }}' > config.json
+sed -i s,_peer-id_,"${PEER_ID}",g config.json
+sed -i s,_private-key_,"${PRIVATE_KEY}",g config.json
+
 ipfs init -- config.json
 
 chown -R ipfs: /data/ipfs
@@ -182,7 +188,7 @@ func applyFlatfsServer(conf *config.Config) error {
 
 // setFlatfsShardFunc Attempts to update the given flatfs configuration to use a shardFunc
 // with the given `n`. If unsuccessful, false will be returned.
-func setFlatfsShardFunc(conf *config.Config, n uint8) error {
+func setFlatfsShardFunc(conf *config.Config, n int8) error {
 	// we want to use next-to-last/3 as the sharding function
 	// as per this issue:
 	// https://github.com/redhat-et/ipfs-operator/issues/32
@@ -210,7 +216,7 @@ func setFlatfsShardFunc(conf *config.Config, n uint8) error {
 			continue
 		}
 		if dsType == "flatfs" {
-			child["shardFunc"] = "/repo/flatfs/shard/v1/next-to-last/" + strconv.FormatUint(uint64(n), 10)
+			child["shardFunc"] = "/repo/flatfs/shard/v1/next-to-last/" + strconv.FormatInt(int64(n), 10)
 			break
 		}
 	}
@@ -241,17 +247,10 @@ func createTemplateConfig(
 	rc config.RelayClient,
 ) (conf config.Config, err error) {
 	// attempt to generate an identity
-	var identity config.Identity
 
-	// try to generate an elliptic curve key first
-	identity, err = config.CreateIdentity(os.Stdout, []options.KeyGenerateOption{
-		options.Key.Type(options.Ed25519Key),
-	})
-	if err != nil {
-		return
-	}
 	// set keys + defaults
-	conf.Identity = identity
+	conf.Identity.PeerID = "_peer-id_"
+	conf.Identity.PrivKey = "_private-key_"
 
 	// apply the server + flatfs profiles
 	if err = applyFlatfsServer(&conf); err != nil {

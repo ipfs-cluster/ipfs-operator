@@ -101,6 +101,10 @@ func (r *IpfsReconciler) statefulSet(m *clusterv1alpha1.Ipfs,
 									Name:      "configure-script",
 									MountPath: "custom",
 								},
+								{
+									Name:      "ipfs-node-data",
+									MountPath: "/node-data",
+								},
 							},
 						},
 					},
@@ -262,6 +266,14 @@ func (r *IpfsReconciler) statefulSet(m *clusterv1alpha1.Ipfs,
 									LocalObjectReference: corev1.LocalObjectReference{
 										Name: configMapBootstrapScriptName,
 									},
+								},
+							},
+						},
+						{
+							Name: "ipfs-node-data",
+							VolumeSource: corev1.VolumeSource{
+								Secret: &corev1.SecretVolumeSource{
+									SecretName: secretName,
 								},
 							},
 						},

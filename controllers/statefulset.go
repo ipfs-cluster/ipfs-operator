@@ -294,7 +294,7 @@ func (r *IpfsReconciler) statefulSet(m *clusterv1alpha1.Ipfs,
 						},
 						Resources: corev1.ResourceRequirements{
 							Requests: corev1.ResourceList{
-								corev1.ResourceStorage: resource.MustParse(m.Spec.IpfsStorage),
+								corev1.ResourceStorage: m.Spec.IpfsStorage,
 							},
 						},
 					},

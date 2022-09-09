@@ -3,6 +3,7 @@ module github.com/redhat-et/ipfs-operator
 go 1.18
 
 require (
+	github.com/alecthomas/units v0.0.0-20211218093645-b94a6e3cc137
 	github.com/ipfs/interface-go-ipfs-core v0.7.0
 	github.com/ipfs/kubo v0.14.0
 	github.com/libp2p/go-libp2p v0.20.3

@@ -80,12 +80,25 @@ func (r *IpfsReconciler) ConfigMapScripts(
 			return err
 		}, ""
 	}
+
+	// reprovider settings
+	reproviderStrategy := m.Spec.Reprovider.Strategy
+	if reproviderStrategy == "" {
+		reproviderStrategy = clusterv1alpha1.ReproviderStrategyAll
+	}
+	reproviderInterval := m.Spec.Reprovider.Interval
+	if reproviderInterval == "" {
+		reproviderInterval = "12h"
+	}
+
 	// get the config script
 	configScript, err := scripts.CreateConfigureScript(
 		maxStorageS,
 		relayPeers,
 		relayConfig,
 		bloomFilterSize,
+		reproviderInterval,
+		string(reproviderStrategy),
 	)
 
 	expected := &corev1.ConfigMap{

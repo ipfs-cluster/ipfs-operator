@@ -63,6 +63,23 @@ spec:
               replicas:
                 format: int32
                 type: integer
+              reprovider:
+                description: Reprovider Describes the settings that each IPFS node
+                  should use when reproviding content.
+                properties:
+                  interval:
+                    description: Interval sets the time between rounds of reproviding
+                      local content to the routing system. Defaults to '12h'.
+                    type: string
+                  strategy:
+                    description: Strategy specifies the reprovider strategy, defaults
+                      to 'all'.
+                    enum:
+                    - all
+                    - pinned
+                    - roots
+                    type: string
+                type: object
               url:
                 type: string
             required:

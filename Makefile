@@ -212,10 +212,37 @@ TMP_DIR=$$(mktemp -d) ;\
 cd $$TMP_DIR ;\
 go mod init tmp ;\
 echo "Downloading $(2)" ;\
-GOBIN=$(PROJECT_DIR)/bin go get $(2) ;\
+GOBIN=$(LOCALBIN) go get $(2) ;\
 rm -rf $$TMP_DIR ;\
 }
 endef
+
+# go-install-tool will 'go install' any package $2 and install it to $1.
+define go-install-tool
+@[ -f $(1) ] || { \
+set -e ;\
+TMP_DIR=$$(mktemp -d) ;\
+cd $$TMP_DIR ;\
+go mod init tmp ;\
+echo "Downloading $(2)" ;\
+GOBIN=$(LOCALBIN) go install $(2) ;\
+rm -rf $$TMP_DIR ;\
+}
+endef
+
+# go-install-mod-tool will 'go install' any package $2 and install it to $1.
+define go-install-mod-tool
+@[ -f $(1) ] || { \
+set -e ;\
+TMP_DIR=$$(mktemp -d) ;\
+cd $$TMP_DIR ;\
+go mod init tmp ;\
+echo "Downloading $(2)" ;\
+GOBIN=$(LOCALBIN) go install -mod=mod $(2) ;\
+rm -rf $$TMP_DIR ;\
+}
+endef
+
 
 .PHONY: bundle
 bundle: manifests kustomize ## Generate bundle manifests and metadata, then validate generated files.
@@ -297,7 +324,7 @@ GINKGO := $(LOCALBIN)/ginkgo
 GINKGO_URL := github.com/onsi/ginkgo/v2/ginkgo
 ginkgo: $(GINKGO) ## Install ginkgo
 $(GINKGO): $(LOCALBIN)
-	$(call install-go-tool-mod,$(LOCALBIN),$(GINKGO_URL))
+	$(call go-install-mod-tool,$(LOCALBIN),$(GINKGO_URL))
 
 
 .PHONY: kustomize
@@ -305,7 +332,7 @@ KUSTOMIZE = $(LOCALBIN)/kustomize
 KUSTOMIZE_URL := sigs.k8s.io/kustomize/kustomize/$(KUSTOMIZE_MAJOR)@$(KUSTOMIZE_VERSION)
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
 $(KUSTOMIZE): $(LOCALBIN)
-	$(call install-go-tool,$(LOCALBIN),$(KUSTOMIZE_URL))
+	$(call go-install-tool,$(LOCALBIN),$(KUSTOMIZE_URL))
 
 .PHONY: helm
 HELM := $(LOCALBIN)/helm

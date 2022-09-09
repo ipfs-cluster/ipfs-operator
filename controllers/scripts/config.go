@@ -138,7 +138,12 @@ const (
 
 // CreateConfigureScript Accepts the given storageMax, peers, and relayClient
 // and returns a completed configuration script which can be ran by the IPFS container config.
-func CreateConfigureScript(storageMax string, peers []peer.AddrInfo, relayConfig config.RelayClient, bloomFilterSize int64) (string, error) {
+func CreateConfigureScript(
+	storageMax string,
+	peers []peer.AddrInfo,
+	relayConfig config.RelayClient,
+	bloomFilterSize int64,
+) (string, error) {
 	configureTmpl, _ := template.New("configureIpfs").Parse(configureIpfs)
 	config, err := createTemplateConfig(storageMax, peers, relayConfig)
 	if err != nil {
@@ -275,7 +280,7 @@ func CalculateBloomFilterSize(ipfsStorage int64) int64 {
 	ipfsStorageAsBytes := units.Base2Bytes(ipfsStorage)
 
 	n := ipfsStorageAsBytes / BloomBlockSize
-	r = float64(-k) / math.Log(1-math.Exp(math.Log(p)/float64(k)))
+	r = -k / math.Log(1-math.Exp(math.Log(p)/k))
 	// number of blocks
 	m = math.Ceil(float64(n) * r)
 	// convert from bits -> bytes

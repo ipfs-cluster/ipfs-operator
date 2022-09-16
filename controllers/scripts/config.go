@@ -244,6 +244,11 @@ func applyIPFSClusterK8sDefaults(conf *config.Config, storageMax string, peers [
 	conf.Swarm.RelayClient = rc
 	conf.Peering.Peers = peers
 	conf.Experimental.AcceleratedDHTClient = true
+	// make sure that we're not announcing or filtering any addresses to avoid
+	// searching entire subnets for peers
+	// issue: https://github.com/ipfs-cluster/ipfs-operator/issues/34
+	conf.Addresses.NoAnnounce = make([]string, 0)
+	conf.Swarm.AddrFilters = make([]string, 0)
 }
 
 // createTemplateConfig Returns a kubo configuration which contains preconfigured

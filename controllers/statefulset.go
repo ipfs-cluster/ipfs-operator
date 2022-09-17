@@ -24,15 +24,26 @@ const (
 
 // Defines port numbers to be used by the IPFS containers.
 const (
-	portAPIHTTP      = 9094
-	portProxyHTTP    = 9095
+	portClusterAPI   = 9094
+	portClusterProxy = 9095
 	portClusterSwarm = 9096
-	portSwarm        = 4001
-	portSwarmUDP     = 4002
-	portAPI          = 5001
-	portPprof        = 6060
-	portWS           = 8081
-	portHTTP         = 8080
+
+	portIpfsSwarm    = 4001
+	portIpfsSwarmUDP = 4002
+	portIpfsAPI      = 5001
+	portIpfsPprof    = 6060
+	portIpfsWS       = 8081
+	portIpfsHttp     = 8080
+
+	nameClusterAPI   = "cluster-api"
+	nameClusterProxy = "cluster-proxy"
+	nameClusterSwarm = "cluster-swarm"
+
+	nameIpfsSwarm    = "swarm"
+	nameIpfsSwarmUDP = "swarm-udp"
+	nameIpfsAPI      = "api"
+	nameIpfsWS       = "ws"
+	nameIpfsHttp     = "http"
 )
 
 // Misclaneous constants.
@@ -53,7 +64,9 @@ const (
 // statefulSet Returns a mutate function that creates a statefulSet for the
 // given IPFS cluster.
 // FIXME: break this function up to use createOrUpdate and set values in the struct line-by-line
-//        instead of setting the entire thing all at once.
+//
+//	instead of setting the entire thing all at once.
+//
 // nolint:funlen // Function is long due to Kube resource definitions
 func (r *IpfsReconciler) statefulSet(m *clusterv1alpha1.Ipfs,
 	sts *appsv1.StatefulSet,
@@ -121,28 +134,28 @@ func (r *IpfsReconciler) statefulSet(m *clusterv1alpha1.Ipfs,
 							},
 							Ports: []corev1.ContainerPort{
 								{
-									Name:          "swarm",
-									ContainerPort: portSwarm,
+									Name:          nameIpfsSwarm,
+									ContainerPort: portIpfsSwarm,
 									Protocol:      corev1.ProtocolTCP,
 								},
 								{
-									Name:          "swarm-udp",
-									ContainerPort: portSwarmUDP,
+									Name:          nameIpfsSwarmUDP,
+									ContainerPort: portIpfsSwarmUDP,
 									Protocol:      corev1.ProtocolUDP,
 								},
 								{
-									Name:          "api",
-									ContainerPort: portAPI,
+									Name:          nameIpfsAPI,
+									ContainerPort: portIpfsAPI,
 									Protocol:      corev1.ProtocolTCP,
 								},
 								{
-									Name:          "ws",
-									ContainerPort: portWS,
+									Name:          nameIpfsWS,
+									ContainerPort: portIpfsWS,
 									Protocol:      corev1.ProtocolTCP,
 								},
 								{
-									Name:          "http",
-									ContainerPort: portHTTP,
+									Name:          nameIpfsHttp,
+									ContainerPort: portIpfsHttp,
 									Protocol:      corev1.ProtocolTCP,
 								},
 							},
@@ -220,17 +233,17 @@ func (r *IpfsReconciler) statefulSet(m *clusterv1alpha1.Ipfs,
 							},
 							Ports: []corev1.ContainerPort{
 								{
-									Name:          "api-http",
-									ContainerPort: portAPIHTTP,
+									Name:          nameClusterAPI,
+									ContainerPort: portClusterAPI,
 									Protocol:      corev1.ProtocolTCP,
 								},
 								{
-									Name:          "proxy-http",
-									ContainerPort: portProxyHTTP,
-									Protocol:      corev1.ProtocolUDP,
+									Name:          nameClusterProxy,
+									ContainerPort: portClusterProxy,
+									Protocol:      corev1.ProtocolTCP,
 								},
 								{
-									Name:          "cluster-swarm",
+									Name:          nameClusterSwarm,
 									ContainerPort: portClusterSwarm,
 									Protocol:      corev1.ProtocolTCP,
 								},
@@ -238,7 +251,7 @@ func (r *IpfsReconciler) statefulSet(m *clusterv1alpha1.Ipfs,
 							LivenessProbe: &corev1.Probe{
 								ProbeHandler: corev1.ProbeHandler{
 									TCPSocket: &corev1.TCPSocketAction{
-										Port: intstr.FromString("cluster-swarm"),
+										Port: intstr.FromString(nameClusterSwarm),
 									},
 								},
 								InitialDelaySeconds: thirtySeconds,

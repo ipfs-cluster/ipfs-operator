@@ -34,13 +34,18 @@ const (
 
 type ReproviderStrategy string
 
+type ExternalStrategy string
+
 const (
 	// ReproviderStrategyAll Announces the CID of every stored block.
 	ReproviderStrategyAll ReproviderStrategy = "all"
 	// ReproviderStrategyPinned Only announces the pinned CIDs recursively.
 	ReproviderStrategyPinned ReproviderStrategy = "pinned"
 	// ReproviderStrategyRoots Only announces the root block of explicitly pinned CIDs.
-	ReproviderStrategyRoots ReproviderStrategy = "roots"
+	ReproviderStrategyRoots      ReproviderStrategy = "roots"
+	ExternalStrategyNone         ExternalStrategy   = "none"
+	ExternalStrategyIngress      ExternalStrategy   = "ingress"
+	ExternalStrategyLoadBalancer ExternalStrategy   = "loadbalancer"
 )
 
 type ReprovideSettings struct {
@@ -52,6 +57,14 @@ type ReprovideSettings struct {
 	// local content to the routing system. Defaults to '12h'.
 	// +optional
 	Interval string `json:"interval,omitempty"`
+}
+
+type ExternalSettings struct {
+	// +kubebuilder:validation:Enum={ingress,loadbalancer,none}
+	// +optional
+	Strategy ExternalStrategy `json:"strategy,omitempty"`
+	// +optional
+	Annotations map[string]string `json:"interval,omitempty"`
 }
 
 type followParams struct {
@@ -72,6 +85,8 @@ type IpfsSpec struct {
 	Replicas       int32             `json:"replicas"`
 	Networking     networkConfig     `json:"networking"`
 	Follows        []followParams    `json:"follows"`
+	Gateway        ExternalSettings  `json:"gateway"`
+	ClusterAPI     ExternalSettings  `json:"clusterApi"`
 	// Reprovider Describes the settings that each IPFS node
 	// should use when reproviding content.
 	// +optional

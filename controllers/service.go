@@ -10,60 +10,112 @@ import (
 	clusterv1alpha1 "github.com/redhat-et/ipfs-operator/api/v1alpha1"
 )
 
+// This is an internal service. It exposes the API and gateway ports
 func (r *IpfsReconciler) serviceCluster(
 	m *clusterv1alpha1.Ipfs,
 	svc *corev1.Service,
 ) (controllerutil.MutateFn, string) {
-	svcName := "ipfs-cluster-" + m.Name
+	svcName := "ipfs-cluster-internal" + m.Name
 	expected := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      svcName,
 			Namespace: m.Namespace,
-			// TODO: annotations for external dns
 		},
 		Spec: corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{
 				{
-					Name:       "swarm",
+					Name:       nameIpfsHttp,
 					Protocol:   corev1.ProtocolTCP,
-					Port:       portSwarm,
-					TargetPort: intstr.FromString("swarm"),
+					Port:       portIpfsHttp,
+					TargetPort: intstr.FromString(nameIpfsHttp),
 				},
 				{
-					Name:       "swarm-udp",
-					Protocol:   corev1.ProtocolUDP,
-					Port:       portSwarmUDP,
-					TargetPort: intstr.FromString("swarm-udp"),
+					Name:       nameClusterAPI,
+					Protocol:   corev1.ProtocolTCP,
+					Port:       portClusterAPI,
+					TargetPort: intstr.FromString(nameClusterAPI),
 				},
 				{
-					Name:       "ws",
+					Name:       nameClusterProxy,
 					Protocol:   corev1.ProtocolTCP,
-					Port:       portWS,
-					TargetPort: intstr.FromString("ws"),
+					Port:       portClusterProxy,
+					TargetPort: intstr.FromString(nameClusterProxy),
 				},
+			},
+			Selector: map[string]string{
+				"app.kubernetes.io/name": "ipfs-cluster-" + m.Name,
+			},
+		},
+	}
+	expected.DeepCopyInto(svc)
+	// FIXME: catch this error before we run the function being returned
+	if err := ctrl.SetControllerReference(m, svc, r.Scheme); err != nil {
+		return func() error { return err }, ""
+	}
+	return func() error {
+		svc.Spec = expected.Spec
+		return nil
+	}, svcName
+}
+
+// If enabled, IPFS gateway serivce
+func (r *IpfsReconciler) serviceGateway(
+	m *clusterv1alpha1.Ipfs,
+	svc *corev1.Service,
+) (controllerutil.MutateFn, string) {
+	svcName := "ipfs-cluster-gateway" + m.Name
+	expected := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        svcName,
+			Namespace:   m.Namespace,
+			Annotations: m.Spec.Gateway.Annotations,
+		},
+		Spec: corev1.ServiceSpec{
+			Type: "LoadBalancer",
+			Ports: []corev1.ServicePort{
 				{
-					Name:       "http",
+					Name:       nameIpfsHttp,
 					Protocol:   corev1.ProtocolTCP,
-					Port:       portHTTP,
-					TargetPort: intstr.FromString("http"),
+					Port:       portIpfsHttp,
+					TargetPort: intstr.FromString(nameIpfsHttp),
 				},
+			},
+			Selector: map[string]string{
+				"app.kubernetes.io/name": "ipfs-cluster-" + m.Name,
+			},
+		},
+	}
+	expected.DeepCopyInto(svc)
+	// FIXME: catch this error before we run the function being returned
+	if err := ctrl.SetControllerReference(m, svc, r.Scheme); err != nil {
+		return func() error { return err }, ""
+	}
+	return func() error {
+		svc.Spec = expected.Spec
+		return nil
+	}, svcName
+}
+
+// If enabled, the cluster API
+func (r *IpfsReconciler) serviceAPI(
+	m *clusterv1alpha1.Ipfs,
+	svc *corev1.Service,
+) (controllerutil.MutateFn, string) {
+	svcName := "ipfs-cluster-internal" + m.Name
+	expected := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        svcName,
+			Namespace:   m.Namespace,
+			Annotations: m.Spec.ClusterAPI.Annotations,
+		},
+		Spec: corev1.ServiceSpec{
+			Type: "LoadBalancer",
+			Ports: []corev1.ServicePort{
 				{
-					Name:       "api-http",
+					Name:       nameClusterAPI,
 					Protocol:   corev1.ProtocolTCP,
-					Port:       portAPIHTTP,
-					TargetPort: intstr.FromString("api-http"),
-				},
-				{
-					Name:       "proxy-http",
-					Protocol:   corev1.ProtocolTCP,
-					Port:       portProxyHTTP,
-					TargetPort: intstr.FromString("proxy-http"),
-				},
-				{
-					Name:       "cluster-swarm",
-					Protocol:   corev1.ProtocolTCP,
-					Port:       portClusterSwarm,
-					TargetPort: intstr.FromString("cluster-swarm"),
+					Port:       portClusterAPI,
+					TargetPort: intstr.FromString(nameClusterAPI),
 				},
 			},
 			Selector: map[string]string{

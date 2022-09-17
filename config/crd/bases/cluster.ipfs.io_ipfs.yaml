@@ -34,6 +34,19 @@ spec:
             type: object
           spec:
             properties:
+              clusterApi:
+                properties:
+                  interval:
+                    additionalProperties:
+                      type: string
+                    type: object
+                  strategy:
+                    enum:
+                    - ingress
+                    - loadbalancer
+                    - none
+                    type: string
+                type: object
               clusterStorage:
                 type: string
               follows:
@@ -48,8 +61,25 @@ spec:
                   - template
                   type: object
                 type: array
+              gateway:
+                properties:
+                  interval:
+                    additionalProperties:
+                      type: string
+                    type: object
+                  strategy:
+                    enum:
+                    - ingress
+                    - loadbalancer
+                    - none
+                    type: string
+                type: object
               ipfsStorage:
-                type: string
+                anyOf:
+                - type: integer
+                - type: string
+                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                x-kubernetes-int-or-string: true
               networking:
                 properties:
                   circuitRelays:
@@ -83,8 +113,10 @@ spec:
               url:
                 type: string
             required:
+            - clusterApi
             - clusterStorage
             - follows
+            - gateway
             - ipfsStorage
             - networking
             - public
@@ -101,8 +133,8 @@ spec:
                   description: "Condition contains details for one aspect of the current
                     state of this API Resource. --- This struct is intended for direct
                     use as an array at the field path .status.conditions.  For example,
-                    type FooStatus struct{ // Represents the observations of a foo's
-                    current state. // Known .status.conditions.type are: \"Available\",
+                    \n type FooStatus struct{ // Represents the observations of a
+                    foo's current state. // Known .status.conditions.type are: \"Available\",
                     \"Progressing\", and \"Degraded\" // +patchMergeKey=type // +patchStrategy=merge
                     // +listType=map // +listMapKey=type Conditions []metav1.Condition
                     `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\"

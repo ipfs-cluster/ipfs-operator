@@ -43,8 +43,8 @@ spec:
         - --leader-elect
         command:
         - /manager
-        image: "{{ include "container-image" (list . .Values.image) }}"
-        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        image: quay.io/redhat-et-ipfs/ipfs-operator:v0.0.1
+        imagePullPolicy: IfNotPresent
         livenessProbe:
           httpGet:
             path: /healthz

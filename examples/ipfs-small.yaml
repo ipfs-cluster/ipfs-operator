@@ -8,6 +8,10 @@ metadata:
 spec:
   ipfsStorage: 2Gi
   clusterStorage: 1Gi
+  clusterApi:
+    strategy: none
+  gateway:
+    strategy: none
   public: false
   replicas: 1
   follows: []

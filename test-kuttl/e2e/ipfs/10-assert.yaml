@@ -6,6 +6,5 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: ipfs-cluster-ipfs-sample-1 
-  namespace: default
 status:
   currentReplicas: 2

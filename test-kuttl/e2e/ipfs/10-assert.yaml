@@ -8,3 +8,4 @@ metadata:
   name: ipfs-cluster-ipfs-sample-1 
 status:
   currentReplicas: 2
+  readyReplicas: 2

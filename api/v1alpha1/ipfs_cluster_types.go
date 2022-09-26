@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -31,6 +32,28 @@ const (
 	ReconciledReasonError string = "ReconcileError"
 )
 
+type ReproviderStrategy string
+
+const (
+	// ReproviderStrategyAll Announces the CID of every stored block.
+	ReproviderStrategyAll ReproviderStrategy = "all"
+	// ReproviderStrategyPinned Only announces the pinned CIDs recursively.
+	ReproviderStrategyPinned ReproviderStrategy = "pinned"
+	// ReproviderStrategyRoots Only announces the root block of explicitly pinned CIDs.
+	ReproviderStrategyRoots ReproviderStrategy = "roots"
+)
+
+type ReprovideSettings struct {
+	// Strategy specifies the reprovider strategy, defaults to 'all'.
+	// +kubebuilder:validation:Enum={all,pinned,roots}
+	// +optional
+	Strategy ReproviderStrategy `json:"strategy,omitempty"`
+	// Interval sets the time between rounds of reproviding
+	// local content to the routing system. Defaults to '12h'.
+	// +optional
+	Interval string `json:"interval,omitempty"`
+}
+
 type followParams struct {
 	Name     string `json:"name"`
 	Template string `json:"template"`
@@ -42,13 +65,17 @@ type networkConfig struct {
 
 type IpfsClusterSpec struct {
 	// +kubebuilder:validation:Optional
-	URL            string         `json:"url"`
-	Public         bool           `json:"public"`
-	IpfsStorage    string         `json:"ipfsStorage"`
-	ClusterStorage string         `json:"clusterStorage"`
-	Replicas       int32          `json:"replicas"`
-	Networking     networkConfig  `json:"networking"`
-	Follows        []followParams `json:"follows"`
+	URL            string            `json:"url"`
+	Public         bool              `json:"public"`
+	IpfsStorage    resource.Quantity `json:"ipfsStorage"`
+	ClusterStorage string            `json:"clusterStorage"`
+	Replicas       int32             `json:"replicas"`
+	Networking     networkConfig     `json:"networking"`
+	Follows        []followParams    `json:"follows"`
+	// Reprovider Describes the settings that each IPFS node
+	// should use when reproviding content.
+	// +optional
+	Reprovider ReprovideSettings `json:"reprovider,omitempty"`
 }
 
 type IpfsStatus struct {

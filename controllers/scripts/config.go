@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"os"
+	"math"
 	"strconv"
 	"text/template"
 
-	"github.com/ipfs/interface-go-ipfs-core/options"
+	"github.com/alecthomas/units"
 	"github.com/ipfs/kubo/config"
 	"github.com/libp2p/go-libp2p-core/peer"
 )
@@ -26,6 +26,11 @@ user=ipfs
 # This is a custom entrypoint for k8s designed to run ipfs nodes in an appropriate
 # setup for production scenarios.
 
+INDEX="${HOSTNAME##*-}"
+
+PRIVATE_KEY=$(cat "/node-data/privateKey-${INDEX}")
+PEER_ID=$(cat "/node-data/peerID-${INDEX}")
+
 if [[ -f /data/ipfs/config ]]; then
 	if [[ -f /data/ipfs/repo.lock ]]; then
 		rm /data/ipfs/repo.lock
@@ -34,6 +39,9 @@ if [[ -f /data/ipfs/config ]]; then
 fi
 
 echo '{{ .FlattenedConfig }}' > config.json
+sed -i s,_peer-id_,"${PEER_ID}",g config.json
+sed -i s,_private-key_,"${PRIVATE_KEY}",g config.json
+
 ipfs init -- config.json
 
 chown -R ipfs: /data/ipfs
@@ -125,15 +133,37 @@ done
 `
 )
 
+const (
+	// BloomFalsePositiveRate Defines the probability of the bloom filter detecting a given value
+	// as being stored.
+	BloomFalsePositiveRate float64 = 0.001
+	// BloomBlockSize Defines the size of blocks used by the bloom filter. This value is the denominator
+	// when determining n = (total size) / (size of blocks).
+	BloomBlockSize = 256 * units.Kibibyte
+)
+
 // CreateConfigureScript Accepts the given storageMax, peers, and relayClient
 // and returns a completed configuration script which can be ran by the IPFS container config.
-func CreateConfigureScript(storageMax string, peers []peer.AddrInfo, relayConfig config.RelayClient) (string, error) {
+func CreateConfigureScript(
+	storageMax string,
+	peers []peer.AddrInfo,
+	relayConfig config.RelayClient,
+	bloomFilterSize int64,
+	reproviderInterval string,
+	reproviderStrategy string,
+) (string, error) {
+	// set settings
 	configureTmpl, _ := template.New("configureIpfs").Parse(configureIpfs)
 	config, err := createTemplateConfig(storageMax, peers, relayConfig)
-	config.Swarm.RelayClient = relayConfig
 	if err != nil {
 		return "", err
 	}
+	config.Swarm.RelayClient = relayConfig
+	config.Datastore.BloomFilterSize = int(bloomFilterSize)
+	config.Reprovider.Interval = reproviderInterval
+	config.Reprovider.Strategy = reproviderStrategy
+
+	// convert config settings into json string
 	configBytes, err := json.Marshal(config)
 	if err != nil {
 		return "", err
@@ -165,7 +195,7 @@ func applyFlatfsServer(conf *config.Config) error {
 
 // setFlatfsShardFunc Attempts to update the given flatfs configuration to use a shardFunc
 // with the given `n`. If unsuccessful, false will be returned.
-func setFlatfsShardFunc(conf *config.Config, n uint8) error {
+func setFlatfsShardFunc(conf *config.Config, n int8) error {
 	// we want to use next-to-last/3 as the sharding function
 	// as per this issue:
 	// https://github.com/redhat-et/ipfs-operator/issues/32
@@ -193,7 +223,7 @@ func setFlatfsShardFunc(conf *config.Config, n uint8) error {
 			continue
 		}
 		if dsType == "flatfs" {
-			child["shardFunc"] = "/repo/flatfs/shard/v1/next-to-last/" + strconv.FormatUint(uint64(n), 10)
+			child["shardFunc"] = "/repo/flatfs/shard/v1/next-to-last/" + strconv.FormatInt(int64(n), 10)
 			break
 		}
 	}
@@ -203,6 +233,7 @@ func setFlatfsShardFunc(conf *config.Config, n uint8) error {
 // applyIPFSClusterK8sDefaults Applies settings to the given Kubo configuration
 // which are customized specifically for running within a Kubernetes cluster.
 func applyIPFSClusterK8sDefaults(conf *config.Config, storageMax string, peers []peer.AddrInfo, rc config.RelayClient) {
+	conf.Bootstrap = config.DefaultBootstrapAddresses
 	conf.Addresses.API = config.Strings{"/ip4/0.0.0.0/tcp/5001"}
 	conf.Addresses.Gateway = config.Strings{"/ip4/0.0.0.0/tcp/8080"}
 	conf.Swarm.ConnMgr.HighWater = 2000
@@ -213,6 +244,10 @@ func applyIPFSClusterK8sDefaults(conf *config.Config, storageMax string, peers [
 	conf.Swarm.RelayClient = rc
 	conf.Peering.Peers = peers
 	conf.Experimental.AcceleratedDHTClient = true
+	// make sure that we're not announcing or filtering any addresses to ensure Kubo daemons can connect via LAN
+	// issue: https://github.com/ipfs-cluster/ipfs-operator/issues/34
+	conf.Addresses.NoAnnounce = make([]string, 0)
+	conf.Swarm.AddrFilters = make([]string, 0)
 }
 
 // createTemplateConfig Returns a kubo configuration which contains preconfigured
@@ -223,17 +258,10 @@ func createTemplateConfig(
 	rc config.RelayClient,
 ) (conf config.Config, err error) {
 	// attempt to generate an identity
-	var identity config.Identity
 
-	// try to generate an elliptic curve key first
-	identity, err = config.CreateIdentity(os.Stdout, []options.KeyGenerateOption{
-		options.Key.Type(options.Ed25519Key),
-	})
-	if err != nil {
-		return
-	}
 	// set keys + defaults
-	conf.Identity = identity
+	conf.Identity.PeerID = "_peer-id_"
+	conf.Identity.PrivKey = "_private-key_"
 
 	// apply the server + flatfs profiles
 	if err = applyFlatfsServer(&conf); err != nil {
@@ -244,4 +272,28 @@ func createTemplateConfig(
 	}
 	applyIPFSClusterK8sDefaults(&conf, storageMax, peers, rc)
 	return
+}
+
+// CalculateBloomFilterSize Accepts the size of the IPFS storage in bytes
+// and returns the bloom filter size to be used in bytes.
+//
+// Computations are done with values based on this issue:
+// https://github.com/redhat-et/ipfs-operator/issues/35#issue-1320941289
+func CalculateBloomFilterSize(ipfsStorage int64) int64 {
+	// formula based on bloom filter calculator:
+	// https://hur.st/bloomfilter
+	var m, p, k, r float64
+	// false-negative rate, 1 / 1000
+	p = BloomFalsePositiveRate
+	// number of hash functions
+	k = 7
+	ipfsStorageAsBytes := units.Base2Bytes(ipfsStorage)
+
+	n := ipfsStorageAsBytes / BloomBlockSize
+	r = -k / math.Log(1-math.Exp(math.Log(p)/k))
+	// number of blocks
+	m = math.Ceil(float64(n) * r)
+	// convert from bits -> bytes
+	bloomFilterSizeBytes := int64(math.Ceil(m / 8))
+	return bloomFilterSizeBytes
 }

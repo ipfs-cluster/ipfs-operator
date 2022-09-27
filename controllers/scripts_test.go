@@ -13,7 +13,7 @@ import (
 
 var _ = Describe("IPFS Reconciler", func() {
 	var ipfsReconciler *controllers.IpfsClusterReconciler
-	var ipfs *v1alpha1.Ipfs
+	var ipfs *v1alpha1.IpfsCluster
 	var configMap *v1.ConfigMap
 	var ctx context.Context
 
@@ -24,7 +24,7 @@ var _ = Describe("IPFS Reconciler", func() {
 			Client: k8sClient,
 		}
 		configMap = &v1.ConfigMap{}
-		ipfs = &v1alpha1.Ipfs{}
+		ipfs = &v1alpha1.IpfsCluster{}
 	})
 
 	When("ConfigMapScripts are edited", func() {

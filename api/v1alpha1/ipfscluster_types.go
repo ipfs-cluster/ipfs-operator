@@ -63,7 +63,7 @@ type networkConfig struct {
 	CircuitRelays int32 `json:"circuitRelays"`
 }
 
-type IpfsSpec struct {
+type IpfsClusterSpec struct {
 	// +kubebuilder:validation:Optional
 	URL            string            `json:"url"`
 	Public         bool              `json:"public"`
@@ -78,7 +78,7 @@ type IpfsSpec struct {
 	Reprovider ReprovideSettings `json:"reprovider,omitempty"`
 }
 
-type IpfsStatus struct {
+type IpfsClusterStatus struct {
 	Conditions    []metav1.Condition `json:"conditions,omitempty"`
 	CircuitRelays []string           `json:"circuitRelays,omitempty"`
 }
@@ -86,24 +86,24 @@ type IpfsStatus struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
-// Ipfs is the Schema for the ipfs API.
-type Ipfs struct {
+// IpfsCluster is the Schema for the ipfs API.
+type IpfsCluster struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   IpfsSpec   `json:"spec,omitempty"`
-	Status IpfsStatus `json:"status,omitempty"`
+	Spec   IpfsClusterSpec   `json:"spec,omitempty"`
+	Status IpfsClusterStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 
 // IpfsList contains a list of Ipfs.
-type IpfsList struct {
+type IpfsClusterList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Ipfs `json:"items"`
+	Items           []IpfsCluster `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&Ipfs{}, &IpfsList{})
+	SchemeBuilder.Register(&IpfsCluster{}, &IpfsClusterList{})
 }

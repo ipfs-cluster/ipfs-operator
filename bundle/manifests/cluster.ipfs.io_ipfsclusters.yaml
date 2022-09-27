@@ -4,20 +4,20 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.8.0
   creationTimestamp: null
-  name: ipfs.cluster.ipfs.io
+  name: ipfsclusters.cluster.ipfs.io
 spec:
   group: cluster.ipfs.io
   names:
-    kind: Ipfs
-    listKind: IpfsList
-    plural: ipfs
-    singular: ipfs
+    kind: IpfsCluster
+    listKind: IpfsClusterList
+    plural: ipfsclusters
+    singular: ipfscluster
   scope: Namespaced
   versions:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: Ipfs is the Schema for the ipfs API
+        description: IpfsCluster is the Schema for the ipfs API.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -35,8 +35,24 @@ spec:
             properties:
               clusterStorage:
                 type: string
+              follows:
+                items:
+                  properties:
+                    name:
+                      type: string
+                    template:
+                      type: string
+                  required:
+                  - name
+                  - template
+                  type: object
+                type: array
               ipfsStorage:
-                type: string
+                anyOf:
+                - type: integer
+                - type: string
+                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                x-kubernetes-int-or-string: true
               networking:
                 properties:
                   circuitRelays:
@@ -50,15 +66,32 @@ spec:
               replicas:
                 format: int32
                 type: integer
+              reprovider:
+                description: Reprovider Describes the settings that each IPFS node
+                  should use when reproviding content.
+                properties:
+                  interval:
+                    description: Interval sets the time between rounds of reproviding
+                      local content to the routing system. Defaults to '12h'.
+                    type: string
+                  strategy:
+                    description: Strategy specifies the reprovider strategy, defaults
+                      to 'all'.
+                    enum:
+                    - all
+                    - pinned
+                    - roots
+                    type: string
+                type: object
               url:
                 type: string
             required:
             - clusterStorage
+            - follows
             - ipfsStorage
             - networking
             - public
             - replicas
-            - url
             type: object
           status:
             properties:
@@ -71,8 +104,8 @@ spec:
                   description: "Condition contains details for one aspect of the current
                     state of this API Resource. --- This struct is intended for direct
                     use as an array at the field path .status.conditions.  For example,
-                    type FooStatus struct{ // Represents the observations of a foo's
-                    current state. // Known .status.conditions.type are: \"Available\",
+                    \n type FooStatus struct{ // Represents the observations of a
+                    foo's current state. // Known .status.conditions.type are: \"Available\",
                     \"Progressing\", and \"Degraded\" // +patchMergeKey=type // +patchStrategy=merge
                     // +listType=map // +listMapKey=type Conditions []metav1.Condition
                     `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\"

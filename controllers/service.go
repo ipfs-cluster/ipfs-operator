@@ -10,8 +10,8 @@ import (
 	clusterv1alpha1 "github.com/redhat-et/ipfs-operator/api/v1alpha1"
 )
 
-func (r *IpfsReconciler) serviceCluster(
-	m *clusterv1alpha1.Ipfs,
+func (r *IpfsClusterReconciler) serviceCluster(
+	m *clusterv1alpha1.IpfsCluster,
 	svc *corev1.Service,
 ) (controllerutil.MutateFn, string) {
 	svcName := "ipfs-cluster-" + m.Name

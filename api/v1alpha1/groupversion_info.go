@@ -15,8 +15,8 @@ limitations under the License.
 */
 
 // Package v1alpha1 contains API Schema definitions for the cluster v1alpha1 API group
-//+kubebuilder:object:generate=true
-//+groupName=cluster.ipfs.io
+// +kubebuilder:object:generate=true
+// +groupName=cluster.ipfs.io
 package v1alpha1
 
 import (

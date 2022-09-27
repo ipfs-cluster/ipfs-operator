@@ -2,7 +2,7 @@
 # without many resources.
 ---
 apiVersion: cluster.ipfs.io/v1alpha1
-kind: Ipfs
+kind: IpfsCluster
 metadata:
   name: ipfs-cluster-small
 spec:

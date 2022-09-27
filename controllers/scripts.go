@@ -143,7 +143,7 @@ func staticAddrsFromRelayPeers(relayPeers []peer.AddrInfo) ([]ma.Multiaddr, erro
 // and returns a list of AddrInfo.
 func (r *IpfsReconciler) getCircuitInfo(
 	ctx context.Context,
-	ipfs *clusterv1alpha1.Ipfs,
+	ipfs *clusterv1alpha1.IpfsCluster,
 ) ([]peer.AddrInfo, error) {
 	log := ctrllog.FromContext(ctx)
 	relayPeers := []peer.AddrInfo{}

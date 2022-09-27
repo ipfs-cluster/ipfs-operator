@@ -113,7 +113,7 @@ func (r *IpfsClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		}
 		if relay.Status.AddrInfo.ID == "" {
 			log.Info("relay is not ready yet. Will continue waiting.", "relay", relayName)
-			return ctrl.Result{RequeueAfter: time.Minute}, nil
+			return ctrl.Result{RequeueAfter: time.Second * 15}, nil
 		}
 	}
 	if err = r.Status().Update(ctx, instance); err != nil {

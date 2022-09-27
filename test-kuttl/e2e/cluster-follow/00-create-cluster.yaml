@@ -1,0 +1,15 @@
+---
+apiVersion: cluster.ipfs.io/v1alpha1
+kind: Ipfs
+metadata:
+  name: cluster-1
+spec:
+  clusterStorage: 1Gi
+  ipfsStorage: 2Gi
+  public: false 
+  replicas: 1
+  networking:
+    circuitRelays: 1
+  follows:
+  - name: gutenberg_es
+    template: gutenberg-es.collab.ipfscluster.io 

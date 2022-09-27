@@ -2,4 +2,5 @@
 resources:
 - cluster_v1alpha1_ipfs.yaml
 - cluster_v1alpha1_circuitrelay.yaml
+- cluster_v1alpha1_ipfscluster.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples

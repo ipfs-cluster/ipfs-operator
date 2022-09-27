@@ -8,7 +8,7 @@ Create a file with the following information
 .. code-block:: yaml
 
    apiVersion: cluster.ipfs.io/v1alpha1
-   kind: Ipfs
+   kind: IpfsCluster
    metadata:
      name: ipfs-sample-1
    spec:

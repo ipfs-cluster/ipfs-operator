@@ -9,7 +9,7 @@ import (
 	clusterv1alpha1 "github.com/redhat-et/ipfs-operator/api/v1alpha1"
 )
 
-func (r *IpfsReconciler) configMapConfig(
+func (r *IpfsClusterReconciler) configMapConfig(
 	m *clusterv1alpha1.IpfsCluster,
 	cm *corev1.ConfigMap,
 	peerid string,

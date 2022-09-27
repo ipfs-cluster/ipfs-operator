@@ -13,7 +13,7 @@ resources:
   controller: true
   domain: ipfs.io
   group: cluster
-  kind: Ipfs
+  kind: CircuitRelay
   path: github.com/redhat-et/ipfs-operator/api/v1alpha1
   version: v1alpha1
 - api:
@@ -22,7 +22,7 @@ resources:
   controller: true
   domain: ipfs.io
   group: cluster
-  kind: CircuitRelay
+  kind: IpfsCluster
   path: github.com/redhat-et/ipfs-operator/api/v1alpha1
   version: v1alpha1
 version: "3"

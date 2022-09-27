@@ -57,7 +57,7 @@ const (
 //	instead of setting the entire thing all at once.
 //
 // nolint:funlen // Function is long due to Kube resource definitions
-func (r *IpfsReconciler) statefulSet(m *clusterv1alpha1.IpfsCluster,
+func (r *IpfsClusterReconciler) statefulSet(m *clusterv1alpha1.IpfsCluster,
 	sts *appsv1.StatefulSet,
 	serviceName string,
 	secretName string,

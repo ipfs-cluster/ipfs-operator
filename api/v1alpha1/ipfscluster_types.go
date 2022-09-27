@@ -78,7 +78,7 @@ type IpfsClusterSpec struct {
 	Reprovider ReprovideSettings `json:"reprovider,omitempty"`
 }
 
-type IpfsStatus struct {
+type IpfsClusterStatus struct {
 	Conditions    []metav1.Condition `json:"conditions,omitempty"`
 	CircuitRelays []string           `json:"circuitRelays,omitempty"`
 }
@@ -91,8 +91,8 @@ type IpfsCluster struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   IpfsClusterSpec `json:"spec,omitempty"`
-	Status IpfsStatus      `json:"status,omitempty"`
+	Spec   IpfsClusterSpec   `json:"spec,omitempty"`
+	Status IpfsClusterStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true

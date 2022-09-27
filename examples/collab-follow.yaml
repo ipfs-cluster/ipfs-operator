@@ -1,6 +1,6 @@
 ---
 apiVersion: cluster.ipfs.io/v1alpha1
-kind: Ipfs
+kind: IpfsCluster
 metadata:
   name: ipfs-sample-collab
 spec:
@@ -22,3 +22,5 @@ spec:
       template: ipfs-collab.ravencoin.network
     - name: wikipedia
       template: wikipedia.collab.ipfscluster.io
+  networking:
+    circuitRelays: 1

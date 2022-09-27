@@ -12,14 +12,14 @@ import (
 )
 
 var _ = Describe("IPFS Reconciler", func() {
-	var ipfsReconciler *controllers.IpfsReconciler
+	var ipfsReconciler *controllers.IpfsClusterReconciler
 	var ipfs *v1alpha1.Ipfs
 	var configMap *v1.ConfigMap
 	var ctx context.Context
 
 	BeforeEach(func() {
 		ctx = context.TODO()
-		ipfsReconciler = &controllers.IpfsReconciler{
+		ipfsReconciler = &controllers.IpfsClusterReconciler{
 			Scheme: k8sClient.Scheme(),
 			Client: k8sClient,
 		}

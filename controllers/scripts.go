@@ -31,7 +31,7 @@ const (
 
 // ConfigMapScripts Returns a mutate function which loads the given configMap with scripts that
 // customize the startup of the IPFS containers depending on the values from the given IPFS cluster resource.
-func (r *IpfsReconciler) ConfigMapScripts(
+func (r *IpfsClusterReconciler) ConfigMapScripts(
 	ctx context.Context,
 	m *clusterv1alpha1.IpfsCluster,
 	cm *corev1.ConfigMap,
@@ -141,7 +141,7 @@ func staticAddrsFromRelayPeers(relayPeers []peer.AddrInfo) ([]ma.Multiaddr, erro
 
 // getCircuitInfo Gets address info from the list of CircuitRelays
 // and returns a list of AddrInfo.
-func (r *IpfsReconciler) getCircuitInfo(
+func (r *IpfsClusterReconciler) getCircuitInfo(
 	ctx context.Context,
 	ipfs *clusterv1alpha1.IpfsCluster,
 ) ([]peer.AddrInfo, error) {

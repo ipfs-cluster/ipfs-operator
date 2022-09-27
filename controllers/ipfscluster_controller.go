@@ -41,17 +41,17 @@ const (
 	finalizer = "openshift.ifps.cluster"
 )
 
-// IpfsReconciler reconciles a Ipfs object.
-type IpfsReconciler struct {
+// IpfsClusterReconciler reconciles a Ipfs object.
+type IpfsClusterReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 }
 
 //+kubebuilder:rbac:groups=*,resources=*,verbs=get;list
 //+kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=cluster.ipfs.io,resources=ipfs,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=cluster.ipfs.io,resources=ipfs/finalizers,verbs=update
-//+kubebuilder:rbac:groups=cluster.ipfs.io,resources=ipfs/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=cluster.ipfs.io,resources=ipfsclusters,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=cluster.ipfs.io,resources=ipfsclusters/finalizers,verbs=update
+//+kubebuilder:rbac:groups=cluster.ipfs.io,resources=ipfsclusters/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
@@ -59,7 +59,7 @@ type IpfsReconciler struct {
 //+kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list;watch;create;update;patch;delete
 
-func (r *IpfsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *IpfsClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
 	// Fetch the Ipfs instance
 	instance, err := r.ensureIPFSCluster(ctx, req)
@@ -127,7 +127,7 @@ func (r *IpfsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 }
 
 // createTrackedObjects Creates a mapping from client objects to their mutating functions.
-func (r *IpfsReconciler) createTrackedObjects(
+func (r *IpfsClusterReconciler) createTrackedObjects(
 	ctx context.Context,
 	instance *clusterv1alpha1.IpfsCluster,
 	peerID peer.ID,
@@ -161,7 +161,7 @@ func (r *IpfsReconciler) createTrackedObjects(
 }
 
 // ensureIPFSCluster Attempts to obtain an IPFS Cluster resource, and error if not found.
-func (r *IpfsReconciler) ensureIPFSCluster(
+func (r *IpfsClusterReconciler) ensureIPFSCluster(
 	ctx context.Context,
 	req ctrl.Request,
 ) (*clusterv1alpha1.IpfsCluster, error) {
@@ -183,7 +183,7 @@ func (r *IpfsReconciler) ensureIPFSCluster(
 // createCircuitRelays Creates the necessary amount of circuit relays if any are missing.
 // FIXME: if we change the number of CircuitRelays, we should update
 // the IPFS config file as well.
-func (r *IpfsReconciler) createCircuitRelays(
+func (r *IpfsClusterReconciler) createCircuitRelays(
 	ctx context.Context,
 	instance *clusterv1alpha1.IpfsCluster,
 ) error {
@@ -216,7 +216,7 @@ func (r *IpfsReconciler) createCircuitRelays(
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *IpfsReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *IpfsClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&clusterv1alpha1.IpfsCluster{}).
 		Owns(&appsv1.StatefulSet{}, builder.OnlyMetadata).

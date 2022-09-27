@@ -17,6 +17,9 @@ Create a file with the following information
      clusterStorage: 2Gi
      replicas: 5
      public: true
+     follows: []
+     networking:
+       circuitRelays: 1
 
 
 Adjust the storage requirements to meet your needs.

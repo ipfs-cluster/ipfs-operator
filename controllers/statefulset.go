@@ -33,7 +33,7 @@ const (
 	portIpfsAPI      = 5001
 	portIpfsPprof    = 6060
 	portIpfsWS       = 8081
-	portIpfsHttp     = 8080
+	portIpfsHTTP     = 8080
 
 	nameClusterAPI   = "cluster-api"
 	nameClusterProxy = "cluster-proxy"
@@ -43,7 +43,7 @@ const (
 	nameIpfsSwarmUDP = "swarm-udp"
 	nameIpfsAPI      = "api"
 	nameIpfsWS       = "ws"
-	nameIpfsHttp     = "http"
+	nameIpfsHTTP     = "http"
 )
 
 // Misclaneous constants.
@@ -154,8 +154,8 @@ func (r *IpfsClusterReconciler) statefulSet(m *clusterv1alpha1.IpfsCluster,
 									Protocol:      corev1.ProtocolTCP,
 								},
 								{
-									Name:          nameIpfsHttp,
-									ContainerPort: portIpfsHttp,
+									Name:          nameIpfsHTTP,
+									ContainerPort: portIpfsHTTP,
 									Protocol:      corev1.ProtocolTCP,
 								},
 							},

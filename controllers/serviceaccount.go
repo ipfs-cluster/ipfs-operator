@@ -8,7 +8,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-func (r *IpfsClusterReconciler) serviceAccount(m *clusterv1alpha1.IpfsCluster, sa *corev1.ServiceAccount) controllerutil.MutateFn {
+func (r *IpfsClusterReconciler) serviceAccount(m *clusterv1alpha1.IpfsCluster,
+	sa *corev1.ServiceAccount) controllerutil.MutateFn {
 	// Define a new Service Account object
 	expected := &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{

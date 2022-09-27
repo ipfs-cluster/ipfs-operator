@@ -65,7 +65,7 @@ rules:
 - apiGroups:
   - cluster.ipfs.io
   resources:
-  - ipfs
+  - ipfsclusters
   verbs:
   - create
   - delete
@@ -77,13 +77,13 @@ rules:
 - apiGroups:
   - cluster.ipfs.io
   resources:
-  - ipfs/finalizers
+  - ipfsclusters/finalizers
   verbs:
   - update
 - apiGroups:
   - cluster.ipfs.io
   resources:
-  - ipfs/status
+  - ipfsclusters/status
   verbs:
   - get
   - patch

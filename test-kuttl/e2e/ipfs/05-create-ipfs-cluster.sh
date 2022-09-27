@@ -4,7 +4,7 @@ set -e -o pipefail
 kubectl apply -n default -f - <<EOF
 ---
 apiVersion: cluster.ipfs.io/v1alpha1
-kind: Ipfs
+kind: IpfsCluster
 metadata:
   name: ipfs-sample-1
 spec:

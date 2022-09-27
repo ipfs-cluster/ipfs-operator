@@ -1,24 +1,24 @@
----
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.8.0
   creationTimestamp: null
-  name: ipfs.cluster.ipfs.io
+  labels: {}
+  name: ipfsclusters.cluster.ipfs.io
 spec:
   group: cluster.ipfs.io
   names:
-    kind: Ipfs
-    listKind: IpfsList
-    plural: ipfs
-    singular: ipfs
+    kind: IpfsCluster
+    listKind: IpfsClusterList
+    plural: ipfsclusters
+    singular: ipfscluster
   scope: Namespaced
   versions:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: Ipfs is the Schema for the ipfs API.
+        description: IpfsCluster is the Schema for the ipfs API.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation

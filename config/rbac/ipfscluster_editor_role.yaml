@@ -1,0 +1,24 @@
+# permissions for end users to edit ipfsclusters.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ipfscluster-editor-role
+rules:
+- apiGroups:
+  - cluster.ipfs.io
+  resources:
+  - ipfsclusters
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - cluster.ipfs.io
+  resources:
+  - ipfsclusters/status
+  verbs:
+  - get

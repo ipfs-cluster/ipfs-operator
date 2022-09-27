@@ -17,7 +17,7 @@ spec:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: CircuitRelay is the Schema for the circuitrelays API
+        description: CircuitRelay is the Schema for the circuitrelays API.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -36,7 +36,7 @@ spec:
           status:
             properties:
               addrInfo:
-                description: This is intended to mimic peer.AddrInfo
+                description: This is intended to mimic peer.AddrInfo.
                 properties:
                   addrs:
                     items:

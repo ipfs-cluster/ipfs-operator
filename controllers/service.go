@@ -11,8 +11,8 @@ import (
 )
 
 // This is an internal service. It exposes the API and gateway ports
-func (r *IpfsReconciler) serviceCluster(
-	m *clusterv1alpha1.Ipfs,
+func (r *IpfsClusterReconciler) serviceCluster(
+	m *clusterv1alpha1.IpfsCluster,
 	svc *corev1.Service,
 ) (controllerutil.MutateFn, string) {
 	svcName := "ipfs-cluster-internal" + m.Name
@@ -59,8 +59,8 @@ func (r *IpfsReconciler) serviceCluster(
 }
 
 // If enabled, IPFS gateway serivce
-func (r *IpfsReconciler) serviceGateway(
-	m *clusterv1alpha1.Ipfs,
+func (r *IpfsClusterReconciler) serviceGateway(
+	m *clusterv1alpha1.IpfsCluster,
 	svc *corev1.Service,
 ) (controllerutil.MutateFn, string) {
 	svcName := "ipfs-cluster-gateway" + m.Name
@@ -97,8 +97,8 @@ func (r *IpfsReconciler) serviceGateway(
 }
 
 // If enabled, the cluster API
-func (r *IpfsReconciler) serviceAPI(
-	m *clusterv1alpha1.Ipfs,
+func (r *IpfsClusterReconciler) serviceAPI(
+	m *clusterv1alpha1.IpfsCluster,
 	svc *corev1.Service,
 ) (controllerutil.MutateFn, string) {
 	svcName := "ipfs-cluster-internal" + m.Name

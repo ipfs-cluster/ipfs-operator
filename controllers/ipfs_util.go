@@ -21,6 +21,7 @@ func newClusterSecret() (string, error) {
 	return hex.EncodeToString(buf), nil
 }
 
+// newKey Generates a new private key and returns that along with the identity.
 func newKey() (ci.PrivKey, peer.ID, error) {
 	const edDSAKeyLen = 4096
 	priv, pub, err := ci.GenerateKeyPair(ci.Ed25519, edDSAKeyLen)

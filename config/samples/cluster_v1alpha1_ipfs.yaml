@@ -1,9 +1,0 @@
-apiVersion: cluster.ipfs.io/v1alpha1
-kind: Ipfs
-metadata:
-  name: ipfs-sample-1
-spec:
-  url: apps.ci-ln-fy6ygqt-72292.origin-ci-int-gce.dev.rhcloud.com
-  ipfsStorage: 32Gi
-  clusterStorage: 42Gi
-  public: true

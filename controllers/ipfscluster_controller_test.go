@@ -31,7 +31,8 @@ var _ = Describe("IPFS Reconciler", func() {
 		secretConfig = &v1.Secret{}
 		ipfs = &v1alpha1.IpfsCluster{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: myName,
+				Name:      myName,
+				Namespace: "test",
 			},
 		}
 	})

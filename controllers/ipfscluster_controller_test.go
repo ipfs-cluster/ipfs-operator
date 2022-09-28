@@ -2,6 +2,7 @@ package controllers_test
 
 import (
 	"context"
+	"encoding/base64"
 	"math/rand"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -81,11 +82,9 @@ var _ = Describe("IPFS Reconciler", func() {
 		It("creates a new peer ids", func() {
 			fn, _ := ipfsReconciler.SecretConfig(ctx, ipfs, secretConfig, clusterSec, bootstrapKey)
 			Expect(fn()).To(BeNil())
-			expectedKeys := int(replicas) * 2
-			// in the real world, StringData will be copied to Data as part of k8s.
-			// However, we are checking it before it has the opportunity.
-			Expect(len(secretConfig.Data)).To(Equal(alwaysKeys))
-			Expect(len(secretConfig.StringData)).To(Equal(expectedKeys))
+			secretStringToData(secretConfig)
+			expectedKeys := int(replicas)*2 + alwaysKeys
+			Expect(len(secretConfig.Data)).To(Equal(expectedKeys))
 
 			// save this so we can check for changes later.
 			dataCopy := make(map[string][]byte)
@@ -101,8 +100,8 @@ var _ = Describe("IPFS Reconciler", func() {
 			ipfs.Spec.Replicas++
 			fn, _ = ipfsReconciler.SecretConfig(ctx, ipfs, secretConfig, clusterSec, bootstrapKey)
 			Expect(fn()).To(BeNil())
-			Expect(len(secretConfig.Data)).To(Equal(alwaysKeys))
-			Expect(len(secretConfig.StringData)).To(Equal(expectedKeys + 2))
+			secretStringToData(secretConfig)
+			Expect(len(secretConfig.Data)).To(Equal(alwaysKeys + 2))
 
 			// expect the old keys to still be the same
 			for k := range dataCopy {
@@ -114,3 +113,14 @@ var _ = Describe("IPFS Reconciler", func() {
 		})
 	})
 })
+
+// The k8s client will encode and copy data from the StringData to Data
+// This function mimics the behavior for tests.
+func secretStringToData(secret *v1.Secret) {
+	for k, v := range secret.StringData {
+		var encoded []byte
+		base64.StdEncoding.Encode(encoded, []byte(v))
+		secret.Data[k] = encoded
+		delete(secret.StringData, k)
+	}
+}

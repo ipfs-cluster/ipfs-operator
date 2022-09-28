@@ -18,7 +18,6 @@ var _ = Describe("IPFS Reconciler", func() {
 	var ipfsReconciler *controllers.IpfsClusterReconciler
 	var ipfs *v1alpha1.IpfsCluster
 	var configMapScripts *v1.ConfigMap
-	var secretConfig *v1.Secret
 	var ctx context.Context
 	const myName = "my-fav-ipfs-node"
 
@@ -29,7 +28,6 @@ var _ = Describe("IPFS Reconciler", func() {
 			Client: k8sClient,
 		}
 		configMapScripts = &v1.ConfigMap{}
-		secretConfig = &v1.Secret{}
 		ipfs = &v1alpha1.IpfsCluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      myName,
@@ -72,14 +70,16 @@ var _ = Describe("IPFS Reconciler", func() {
 		// we always expect there to be cluster secrets, which have two values
 		const alwaysKeys = 2
 		var (
-			replicas     = rand.Int31n(100)
 			clusterSec   = []byte("cluster secret")
 			bootstrapKey = []byte("bootstrap private key")
+			replicas     int32
 		)
 		BeforeEach(func() {
+			replicas = rand.Int31n(100)
 			ipfs.Spec.Replicas = replicas
 		})
 		It("creates a new peer ids", func() {
+			secretConfig := &v1.Secret{}
 			fn, _ := ipfsReconciler.SecretConfig(ctx, ipfs, secretConfig, clusterSec, bootstrapKey)
 			Expect(fn()).To(BeNil())
 			secretStringToData(secretConfig)
@@ -114,6 +114,6 @@ func secretStringToData(secret *v1.Secret) {
 		enc := make([]byte, base64.StdEncoding.EncodedLen(len(bv)))
 		base64.StdEncoding.Encode(enc, bv)
 		secret.Data[k] = enc
-		delete(secret.StringData, k)
 	}
+	secret.StringData = make(map[string]string)
 }

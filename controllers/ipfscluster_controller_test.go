@@ -88,14 +88,9 @@ var _ = Describe("IPFS Reconciler", func() {
 
 			// save this so we can check for changes later.
 			dataCopy := make(map[string][]byte)
-			stringCopy := make(map[string]string)
 			for k, v := range secretConfig.Data {
 				dataCopy[k] = v
 			}
-			for k, v := range secretConfig.StringData {
-				stringCopy[k] = v
-			}
-
 			// increase the replica count. Expect to see new keys generated.
 			ipfs.Spec.Replicas++
 			fn, _ = ipfsReconciler.SecretConfig(ctx, ipfs, secretConfig, clusterSec, bootstrapKey)
@@ -106,9 +101,6 @@ var _ = Describe("IPFS Reconciler", func() {
 			// expect the old keys to still be the same
 			for k := range dataCopy {
 				Expect(dataCopy[k]).To(Equal(secretConfig.Data[k]))
-			}
-			for k := range stringCopy {
-				Expect(stringCopy[k]).To(Equal(secretConfig.StringData[k]))
 			}
 		})
 	})

@@ -81,7 +81,7 @@ var _ = Describe("IPFS Reconciler", func() {
 		It("creates a new peer ids", func() {
 			fn, _ := ipfsReconciler.SecretConfig(ctx, ipfs, secretConfig, clusterSec, bootstrapKey)
 			Expect(fn()).To(BeNil())
-			expectedKeys := replicas * 2
+			expectedKeys := int(replicas) * 2
 			// in the real world, StringData will be copied to Data as part of k8s.
 			// However, we are checking it before it has the opportunity.
 			Expect(len(secretConfig.Data)).To(Equal(alwaysKeys))

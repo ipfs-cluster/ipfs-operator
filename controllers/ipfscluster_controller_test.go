@@ -101,7 +101,7 @@ var _ = Describe("IPFS Reconciler", func() {
 			fn, _ = ipfsReconciler.SecretConfig(ctx, ipfs, secretConfig, clusterSec, bootstrapKey)
 			Expect(fn()).To(BeNil())
 			secretStringToData(secretConfig)
-			Expect(len(secretConfig.Data)).To(Equal(alwaysKeys + 2))
+			Expect(len(secretConfig.Data)).To(Equal(expectedKeys + 2))
 
 			// expect the old keys to still be the same
 			for k := range dataCopy {

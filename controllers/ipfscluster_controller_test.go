@@ -79,7 +79,7 @@ var _ = Describe("IPFS Reconciler", func() {
 		})
 		It("creates a new peer ids", func() {
 			fn, _ := ipfsReconciler.SecretConfig(ctx, ipfs, secretConfig, clusterSec, bootstrapKey)
-			fn()
+			Expect(fn()).To(BeNil())
 			expectedKeys := alwaysKeys + (replicas * 2)
 			Expect(len(secretConfig.Data)).To(Equal(expectedKeys))
 
@@ -91,7 +91,8 @@ var _ = Describe("IPFS Reconciler", func() {
 
 			// increase the replica count. Expect to see new keys generated.
 			ipfs.Spec.Replicas++
-			fn()
+			fn, _ = ipfsReconciler.SecretConfig(ctx, ipfs, secretConfig, clusterSec, bootstrapKey)
+			Expect(fn()).To(BeNil())
 			Expect(len(secretConfig.Data)).To(Equal(expectedKeys + 2))
 
 			// expect the old keys to still be the same

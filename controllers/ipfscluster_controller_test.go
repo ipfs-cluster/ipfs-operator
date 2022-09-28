@@ -70,7 +70,7 @@ var _ = Describe("IPFS Reconciler", func() {
 		// we always expect there to be cluster secrets, which have two values
 		const alwaysKeys = 2
 		var (
-			replicas     = rand.Int31()
+			replicas     = rand.Int31n(100)
 			clusterSec   = []byte("cluster secret")
 			bootstrapKey = []byte("bootstrap private key")
 		)

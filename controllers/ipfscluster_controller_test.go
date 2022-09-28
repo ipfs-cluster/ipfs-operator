@@ -118,9 +118,10 @@ var _ = Describe("IPFS Reconciler", func() {
 // This function mimics the behavior for tests.
 func secretStringToData(secret *v1.Secret) {
 	for k, v := range secret.StringData {
-		var encoded []byte
-		base64.StdEncoding.Encode(encoded, []byte(v))
-		secret.Data[k] = encoded
+		bv := []byte(v)
+		enc := make([]byte, base64.StdEncoding.EncodedLen(len(bv)))
+		base64.StdEncoding.Encode(enc, bv)
+		secret.Data[k] = enc
 		delete(secret.StringData, k)
 	}
 }

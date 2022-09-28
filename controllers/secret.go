@@ -28,7 +28,7 @@ func errorFunc(err error) controllerutil.MutateFn {
 	}
 }
 
-func (r *IpfsClusterReconciler) secretConfig(
+func (r *IpfsClusterReconciler) SecretConfig(
 	ctx context.Context,
 	m *clusterv1alpha1.IpfsCluster,
 	sec *corev1.Secret,

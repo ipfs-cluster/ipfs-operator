@@ -79,23 +79,23 @@ func (r *IpfsClusterReconciler) statefulSet(m *clusterv1alpha1.IpfsCluster,
 	ipfsStoragei64, _ := m.Spec.IpfsStorage.AsInt64()
 	ipfsStorageTB := ipfsStoragei64 / 1024 / 1024 / 1024 / 1024
 	ipfsMilliCoresMin := 4000 + (500 * ipfsStorageTB)
-	ipfsRamGBMin := ipfsStorageTB
-	if ipfsRamGBMin < 2 {
-		ipfsRamGBMin = 2
+	ipfsRAMGBMin := ipfsStorageTB
+	if ipfsRAMGBMin < 2 {
+		ipfsRAMGBMin = 2
 	}
 
-	ipfsRamMinQuantity := resource.NewScaledQuantity(ipfsRamGBMin, resource.Giga)
-	ipfsRamMaxQuantity := resource.NewScaledQuantity(2*ipfsRamGBMin, resource.Giga)
+	ipfsRAMMinQuantity := resource.NewScaledQuantity(ipfsRAMGBMin, resource.Giga)
+	ipfsRAMMaxQuantity := resource.NewScaledQuantity(2*ipfsRAMGBMin, resource.Giga)
 	ipfsCoresMinQuantity := resource.NewScaledQuantity(ipfsMilliCoresMin, resource.Milli)
 	ipfsCoresMaxQuantity := resource.NewScaledQuantity(2*ipfsMilliCoresMin, resource.Milli)
 
 	ipfsResources = corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{
-			corev1.ResourceMemory: *ipfsRamMinQuantity,
+			corev1.ResourceMemory: *ipfsRAMMinQuantity,
 			corev1.ResourceCPU:    *ipfsCoresMinQuantity,
 		},
 		Limits: corev1.ResourceList{
-			corev1.ResourceMemory: *ipfsRamMaxQuantity,
+			corev1.ResourceMemory: *ipfsRAMMaxQuantity,
 			corev1.ResourceCPU:    *ipfsCoresMaxQuantity,
 		},
 	}

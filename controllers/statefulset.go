@@ -67,7 +67,6 @@ func (r *IpfsClusterReconciler) statefulSet(m *clusterv1alpha1.IpfsCluster,
 	ssName := "ipfs-cluster-" + m.Name
 
 	var ipfsResources corev1.ResourceRequirements
-	ipfsStorageQuantity, err := resource.ParseQuantity(m.Spec.IpfsStorage)
 
 	// Determine resource constraints from how much we are storing.
 	// for every TB of storage, Request 1GB of memory and limit if we exceed 2x this amount.
@@ -77,32 +76,28 @@ func (r *IpfsClusterReconciler) statefulSet(m *clusterv1alpha1.IpfsCluster,
 	// biggest node we would allocate would request a minimum allocation of 16G of RAM and 12 cores
 	// and would permit usage up to twice this size
 
-	if err != nil {
-		ipfsResources = corev1.ResourceRequirements{}
-	} else {
-		ipfsStoragei64, _ := ipfsStorageQuantity.AsInt64()
-		ipfsStorageTB := ipfsStoragei64 / 1024 / 1024 / 1024 / 1024
-		ipfsMilliCoresMin := 4000 + (500 * ipfsStorageTB)
-		ipfsRamGBMin := ipfsStorageTB
-		if ipfsRamGBMin < 2 {
-			ipfsRamGBMin = 2
-		}
+	ipfsStoragei64, _ := m.Spec.IpfsStorage.AsInt64()
+	ipfsStorageTB := ipfsStoragei64 / 1024 / 1024 / 1024 / 1024
+	ipfsMilliCoresMin := 4000 + (500 * ipfsStorageTB)
+	ipfsRamGBMin := ipfsStorageTB
+	if ipfsRamGBMin < 2 {
+		ipfsRamGBMin = 2
+	}
 
-		ipfsRamMinQuantity := resource.NewScaledQuantity(ipfsRamGBMin, resource.Giga)
-		ipfsRamMaxQuantity := resource.NewScaledQuantity(2*ipfsRamGBMin, resource.Giga)
-		ipfsCoresMinQuantity := resource.NewScaledQuantity(ipfsMilliCoresMin, resource.Milli)
-		ipfsCoresMaxQuantity := resource.NewScaledQuantity(2*ipfsMilliCoresMin, resource.Milli)
+	ipfsRamMinQuantity := resource.NewScaledQuantity(ipfsRamGBMin, resource.Giga)
+	ipfsRamMaxQuantity := resource.NewScaledQuantity(2*ipfsRamGBMin, resource.Giga)
+	ipfsCoresMinQuantity := resource.NewScaledQuantity(ipfsMilliCoresMin, resource.Milli)
+	ipfsCoresMaxQuantity := resource.NewScaledQuantity(2*ipfsMilliCoresMin, resource.Milli)
 
-		ipfsResources = corev1.ResourceRequirements{
-			Requests: corev1.ResourceList{
-				corev1.ResourceMemory: *ipfsRamMinQuantity,
-				corev1.ResourceCPU:    *ipfsCoresMinQuantity,
-			},
-			Limits: corev1.ResourceList{
-				corev1.ResourceMemory: *ipfsRamMaxQuantity,
-				corev1.ResourceCPU:    *ipfsCoresMaxQuantity,
-			},
-		}
+	ipfsResources = corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{
+			corev1.ResourceMemory: *ipfsRamMinQuantity,
+			corev1.ResourceCPU:    *ipfsCoresMinQuantity,
+		},
+		Limits: corev1.ResourceList{
+			corev1.ResourceMemory: *ipfsRamMaxQuantity,
+			corev1.ResourceCPU:    *ipfsCoresMaxQuantity,
+		},
 	}
 
 	expected := &appsv1.StatefulSet{

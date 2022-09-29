@@ -107,7 +107,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controllers.IpfsReconciler{
+	if err = (&controllers.IpfsClusterReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
@@ -119,6 +119,13 @@ func main() {
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "CircuitRelay")
+		os.Exit(1)
+	}
+	if err = (&controllers.IpfsClusterReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "IpfsCluster")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder

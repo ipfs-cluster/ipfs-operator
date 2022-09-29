@@ -57,7 +57,7 @@ const (
 //	instead of setting the entire thing all at once.
 //
 // nolint:funlen // Function is long due to Kube resource definitions
-func (r *IpfsReconciler) statefulSet(m *clusterv1alpha1.Ipfs,
+func (r *IpfsClusterReconciler) statefulSet(m *clusterv1alpha1.IpfsCluster,
 	sts *appsv1.StatefulSet,
 	serviceName string,
 	secretName string,
@@ -141,6 +141,10 @@ func (r *IpfsReconciler) statefulSet(m *clusterv1alpha1.Ipfs,
 								{
 									Name:      "configure-script",
 									MountPath: "custom",
+								},
+								{
+									Name:      "ipfs-node-data",
+									MountPath: "/node-data",
 								},
 							},
 						},
@@ -306,6 +310,14 @@ func (r *IpfsReconciler) statefulSet(m *clusterv1alpha1.Ipfs,
 								},
 							},
 						},
+						{
+							Name: "ipfs-node-data",
+							VolumeSource: corev1.VolumeSource{
+								Secret: &corev1.SecretVolumeSource{
+									SecretName: secretName,
+								},
+							},
+						},
 					},
 				},
 			},
@@ -335,7 +347,7 @@ func (r *IpfsReconciler) statefulSet(m *clusterv1alpha1.Ipfs,
 						},
 						Resources: corev1.ResourceRequirements{
 							Requests: corev1.ResourceList{
-								corev1.ResourceStorage: resource.MustParse(m.Spec.IpfsStorage),
+								corev1.ResourceStorage: m.Spec.IpfsStorage,
 							},
 						},
 					},
@@ -360,7 +372,7 @@ func (r *IpfsReconciler) statefulSet(m *clusterv1alpha1.Ipfs,
 }
 
 // followContainers Returns a list of container objects which follow the given followParams.
-func followContainers(m *clusterv1alpha1.Ipfs) []corev1.Container {
+func followContainers(m *clusterv1alpha1.IpfsCluster) []corev1.Container {
 	// objects need to be RFC-1123 compliant, and k8s uses this regex to test.
 	// https://github.com/kubernetes/apimachinery/blob/v0.24.2/pkg/util/validation/validation.go
 	// dns1123LabelFmt "[a-z0-9]([-a-z0-9]*[a-z0-9])?"

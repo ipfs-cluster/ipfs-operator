@@ -3,7 +3,7 @@ module github.com/redhat-et/ipfs-operator
 go 1.18
 
 require (
-	github.com/ipfs/interface-go-ipfs-core v0.7.0
+	github.com/alecthomas/units v0.0.0-20211218093645-b94a6e3cc137
 	github.com/ipfs/kubo v0.14.0
 	github.com/libp2p/go-libp2p v0.20.3
 	github.com/libp2p/go-libp2p-core v0.16.1
@@ -48,6 +48,7 @@ require (
 	github.com/ipfs/go-merkledag v0.6.0 // indirect
 	github.com/ipfs/go-metrics-interface v0.0.1 // indirect
 	github.com/ipfs/go-verifcid v0.0.1 // indirect
+	github.com/ipfs/interface-go-ipfs-core v0.7.0 // indirect
 	github.com/ipld/go-codec-dagpb v1.4.0 // indirect
 	github.com/ipld/go-ipld-prime v0.17.0 // indirect
 	github.com/jbenet/goprocess v0.1.4 // indirect

@@ -130,8 +130,9 @@ vet: ## Run go vet against code.
 
 .PHONY: test
 GINKGO_ARGS ?= --progress --fail-on-pending --keep-going --cover --coverprofile=cover.profile --race --trace --json-report=report.json --timeout=3m
+GINKGO_TARGETS ?= ./...
 test: lint manifests generate fmt vet lint envtest ginkgo ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GINKGO) run $(GINKGO_ARGS) ./...
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GINKGO) run $(GINKGO_ARGS) $(GINKGO_TARGETS)
 
 .PHONY: test-e2e
 test-e2e: kuttl ## Run e2e tests. Requires cluster w/ Scribe already installed
@@ -211,10 +212,37 @@ TMP_DIR=$$(mktemp -d) ;\
 cd $$TMP_DIR ;\
 go mod init tmp ;\
 echo "Downloading $(2)" ;\
-GOBIN=$(PROJECT_DIR)/bin go get $(2) ;\
+GOBIN=$(LOCALBIN) go get $(2) ;\
 rm -rf $$TMP_DIR ;\
 }
 endef
+
+# go-install-tool will 'go install' any package $2 and install it to $1.
+define go-install-tool
+@[ -f $(1) ] || { \
+set -e ;\
+TMP_DIR=$$(mktemp -d) ;\
+cd $$TMP_DIR ;\
+go mod init tmp ;\
+echo "Downloading $(2)" ;\
+GOBIN=$(LOCALBIN) go install $(2) ;\
+rm -rf $$TMP_DIR ;\
+}
+endef
+
+# go-install-mod-tool will 'go install' any package $2 and install it to $1.
+define go-install-mod-tool
+@[ -f $(1) ] || { \
+set -e ;\
+TMP_DIR=$$(mktemp -d) ;\
+cd $$TMP_DIR ;\
+go mod init tmp ;\
+echo "Downloading $(2)" ;\
+GOBIN=$(LOCALBIN) go install -mod=mod $(2) ;\
+rm -rf $$TMP_DIR ;\
+}
+endef
+
 
 .PHONY: bundle
 bundle: manifests kustomize ## Generate bundle manifests and metadata, then validate generated files.
@@ -273,7 +301,7 @@ catalog-push: ## Push a catalog image.
 	$(MAKE) docker-push IMG=$(CATALOG_IMG)
 
 
-##@ Download Utilities
+##@ Download tools
 
 # download-tool will curl any file $2 and install it to $1.
 define download-tool
@@ -282,31 +310,8 @@ set -e ;\
 echo "📥 Downloading $(2)" ;\
 curl -sSLo "$(1)" "$(2)" ;\
 chmod a+x "$(1)" ;\
-echo "✅ Done" ;\
 }
 endef
-
-# install-go-tool will download any $2 URL and install to $1
-define install-go-tool
-@[ -f $(1) ] || { \
-set -e ;\
-echo "📥 Downloading $(2)" ;\
-GOBIN=$(1) go install $(2) ;\
-echo "✅ Done" ;\
-}
-endef
-
-# install-go-tool will download any $2 URL and install to $1
-define install-go-tool-mod
-@[ -f $(1) ] || { \
-set -e ;\
-echo "📥 Downloading $(2)" ;\
-GOBIN=$(1) go install -mod=mod $(2) ;\
-echo "✅ Done" ;\
-}
-endef
-
-
 
 .PHONY: kuttl
 KUTTL := $(LOCALBIN)/kuttl
@@ -319,7 +324,7 @@ GINKGO := $(LOCALBIN)/ginkgo
 GINKGO_URL := github.com/onsi/ginkgo/v2/ginkgo
 ginkgo: $(GINKGO) ## Install ginkgo
 $(GINKGO): $(LOCALBIN)
-	$(call install-go-tool-mod,$(LOCALBIN),$(GINKGO_URL))
+	$(call go-install-mod-tool,$(LOCALBIN),$(GINKGO_URL))
 
 
 .PHONY: kustomize
@@ -327,7 +332,7 @@ KUSTOMIZE = $(LOCALBIN)/kustomize
 KUSTOMIZE_URL := sigs.k8s.io/kustomize/kustomize/$(KUSTOMIZE_MAJOR)@$(KUSTOMIZE_VERSION)
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
 $(KUSTOMIZE): $(LOCALBIN)
-	$(call install-go-tool,$(LOCALBIN),$(KUSTOMIZE_URL))
+	$(call go-install-tool,$(LOCALBIN),$(KUSTOMIZE_URL))
 
 .PHONY: helm
 HELM := $(LOCALBIN)/helm

@@ -8,7 +8,7 @@ Create a file with the following information
 .. code-block:: yaml
 
    apiVersion: cluster.ipfs.io/v1alpha1
-   kind: Ipfs
+   kind: IpfsCluster
    metadata:
      name: ipfs-sample-1
    spec:
@@ -17,6 +17,9 @@ Create a file with the following information
      clusterStorage: 2Gi
      replicas: 5
      public: true
+     follows: []
+     networking:
+       circuitRelays: 1
 
 
 Adjust the storage requirements to meet your needs.

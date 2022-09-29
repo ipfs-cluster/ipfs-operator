@@ -14,20 +14,15 @@ metadata:
         },
         {
           "apiVersion": "cluster.ipfs.io/v1alpha1",
-          "kind": "Ipfs",
+          "kind": "IpfsCluster",
           "metadata": {
-            "name": "ipfs-sample-1"
+            "name": "ipfscluster-sample"
           },
-          "spec": {
-            "clusterStorage": "42Gi",
-            "ipfsStorage": "32Gi",
-            "public": true,
-            "url": "apps.ci-ln-fy6ygqt-72292.origin-ci-int-gce.dev.rhcloud.com"
-          }
+          "spec": null
         }
       ]
     capabilities: Basic Install
-    operators.operatorframework.io/builder: operator-sdk-v1.19.0+git
+    operators.operatorframework.io/builder: operator-sdk-unknown
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
   name: ipfs-operator.v0.0.1
   namespace: placeholder
@@ -35,15 +30,15 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
-    - description: CircuitRelay is the Schema for the circuitrelays API
+    - description: CircuitRelay is the Schema for the circuitrelays API.
       displayName: Circuit Relay
       kind: CircuitRelay
       name: circuitrelays.cluster.ipfs.io
       version: v1alpha1
-    - description: Ipfs is the Schema for the ipfs API
-      displayName: Ipfs
-      kind: Ipfs
-      name: ipfs.cluster.ipfs.io
+    - description: IpfsCluster is the Schema for the ipfs API.
+      displayName: Ipfs Cluster
+      kind: IpfsCluster
+      name: ipfsclusters.cluster.ipfs.io
       version: v1alpha1
   description: Operator for IPFS clustering
   displayName: ipfs
@@ -114,7 +109,7 @@ spec:
         - apiGroups:
           - cluster.ipfs.io
           resources:
-          - ipfs
+          - ipfsclusters
           verbs:
           - create
           - delete
@@ -126,13 +121,13 @@ spec:
         - apiGroups:
           - cluster.ipfs.io
           resources:
-          - ipfs/finalizers
+          - ipfsclusters/finalizers
           verbs:
           - update
         - apiGroups:
           - cluster.ipfs.io
           resources:
-          - ipfs/status
+          - ipfsclusters/status
           verbs:
           - get
           - patch
@@ -264,7 +259,7 @@ spec:
                 - --leader-elect
                 command:
                 - /manager
-                image: quay.io/redhat-et-ipfs/ipfs-operator:v0.0.1
+                image: coryschwartz/ipfs-operator:v0.0.1
                 imagePullPolicy: IfNotPresent
                 livenessProbe:
                   httpGet:

@@ -144,7 +144,14 @@ func (r *IpfsClusterReconciler) createTrackedObjects(
 	mutsvc, svcName := r.serviceCluster(instance, &svc)
 
 	mutCmScripts, cmScriptName := r.ConfigMapScripts(ctx, instance, &cmScripts)
-	mutSecConfig, secConfigName := r.SecretConfig(ctx, instance, &secConfig, []byte(clusterSecret), []byte(privateString), peerID.String())
+	mutSecConfig, secConfigName := r.SecretConfig(
+		ctx,
+		instance,
+		&secConfig,
+		[]byte(clusterSecret),
+		[]byte(privateString),
+		peerID.String(),
+	)
 	mutSts := r.statefulSet(instance, &sts, svcName, secConfigName, cmScriptName)
 
 	trackedObjects := map[client.Object]controllerutil.MutateFn{

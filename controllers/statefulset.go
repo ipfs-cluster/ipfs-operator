@@ -61,12 +61,9 @@ func (r *IpfsClusterReconciler) statefulSet(m *clusterv1alpha1.IpfsCluster,
 	sts *appsv1.StatefulSet,
 	serviceName string,
 	secretName string,
-	configMapName string,
 	configMapBootstrapScriptName string,
 ) controllerutil.MutateFn {
 	ssName := "ipfs-cluster-" + m.Name
-
-	var ipfsResources corev1.ResourceRequirements
 
 	// Determine resource constraints from how much we are storing.
 	// for every TB of storage, Request 1GB of memory and limit if we exceed 2x this amount.
@@ -89,7 +86,7 @@ func (r *IpfsClusterReconciler) statefulSet(m *clusterv1alpha1.IpfsCluster,
 	ipfsCoresMinQuantity := resource.NewScaledQuantity(ipfsMilliCoresMin, resource.Milli)
 	ipfsCoresMaxQuantity := resource.NewScaledQuantity(2*ipfsMilliCoresMin, resource.Milli)
 
-	ipfsResources = corev1.ResourceRequirements{
+	ipfsResources := corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{
 			corev1.ResourceMemory: *ipfsRAMMinQuantity,
 			corev1.ResourceCPU:    *ipfsCoresMinQuantity,
@@ -215,9 +212,9 @@ func (r *IpfsClusterReconciler) statefulSet(m *clusterv1alpha1.IpfsCluster,
 								{
 									Name: "BOOTSTRAP_PEER_ID",
 									ValueFrom: &corev1.EnvVarSource{
-										ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+										SecretKeyRef: &corev1.SecretKeySelector{
 											LocalObjectReference: corev1.LocalObjectReference{
-												Name: configMapName,
+												Name: secretName,
 											},
 											Key: "BOOTSTRAP_PEER_ID",
 										},

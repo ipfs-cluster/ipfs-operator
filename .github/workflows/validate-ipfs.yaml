@@ -133,7 +133,19 @@ jobs:
           ipfs-cluster ./helm/ipfs-operator
 
     - name: run e2e tests
+      shell: /bin/bash
       run: |
+        # get the current shell
+        current_shell() {
+          currentShell=$(readlink /proc/"${$}"/exe)
+          printf "using shell: %s\n" "${currentShell}"
+          version=$("${currentShell}" --version)
+          printf "shell version: %s\n" "${version}"
+        }
+        current_shell
+
+        printf "########################################\navailable shells:\n%s\n" "$(cat /etc/shell)"
+
         mkdir bin
         make test-e2e
 

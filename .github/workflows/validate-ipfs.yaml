@@ -133,7 +133,7 @@ jobs:
           ipfs-cluster ./helm/ipfs-operator
 
     - name: run e2e tests
-      shell: /bin/bash
+      shell: bash
       run: |
         # get the current shell
         current_shell() {

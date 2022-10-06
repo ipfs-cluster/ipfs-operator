@@ -4,6 +4,7 @@ kind: TestStep
 timeout: 600
 commands:
   - script: |
+      #!/bin/bash
       set -eo pipefail
       
       # imports

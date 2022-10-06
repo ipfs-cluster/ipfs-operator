@@ -5,6 +5,18 @@ timeout: 900
 commands:
   - script: |
       #!/bin/bash
+
+      current_shell() {
+        currentShell=$(readlink /proc/"${$}"/exe)
+        printf "using shell: %s\n" "${currentShell}"
+        version=$("${currentShell}" --version)
+        printf "shell version: %s\n" "${version}"
+      }
+      current_shell
+
+      # show all available shells
+      cat /etc/shells
+
       set -eo pipefail
       
       # imports

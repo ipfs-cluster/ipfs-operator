@@ -20,6 +20,17 @@ jobs:
     runs-on: ubuntu-20.04
 
     steps:
+      - name: Check shell
+        run: |
+          # get the current shell
+
+          current_shell() {
+            currentShell=$(readlink /proc/"${$}"/exe)
+            printf "using shell: %s\n" "${currentShell}"
+            version=$("${currentShell}" --version)
+            printf "shell version: %s\n" "${version}"
+          }
+          current_shell
       - name: Checkout source
         uses: actions/checkout@v2
 

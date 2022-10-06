@@ -144,7 +144,7 @@ jobs:
         }
         current_shell
 
-        printf "########################################\navailable shells:\n%s\n" "$(cat /etc/shell)"
+        printf "########################################\navailable shells:\n%s\n" "$(cat /etc/shells)"
 
         mkdir bin
         make test-e2e

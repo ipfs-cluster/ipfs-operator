@@ -1,6 +1,17 @@
 #!/bin/sh
-set -e -o pipefail
 
+current_shell() {
+  currentShell=$(readlink /proc/"${$}"/exe)
+  printf "using shell: %s\n" "${currentShell}"
+  version=$("${currentShell}" --version)
+  printf "shell version: %s\n" "${version}"
+}
+
+current_shell
+
+set -eo pipefail
+
+# imports
 source './utils.sh'
 
 # get the name of an IPFS Cluster pod

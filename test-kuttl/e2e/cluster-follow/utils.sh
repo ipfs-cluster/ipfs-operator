@@ -1,7 +1,3 @@
-#!/bin/sh
-set -e -o pipefail
-
-
 ########################################
 # logs a message to stdout.
 # Globals:

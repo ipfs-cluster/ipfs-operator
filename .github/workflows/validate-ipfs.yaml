@@ -33,6 +33,10 @@ jobs:
           current_shell
       - name: Checkout source
         uses: actions/checkout@v2
+      - name: Check kuttl versioon
+        run: |
+          make kuttl
+          ./bin/kuttl --version
 
       - name: Install Go
         uses: actions/setup-go@v1

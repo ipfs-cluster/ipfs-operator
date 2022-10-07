@@ -3,6 +3,7 @@ package utils
 import (
 	"context"
 
+	"github.com/alecthomas/units"
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -46,7 +47,6 @@ func ErrFunc(err error) controllerutil.MutateFn {
 // IPFSContainerResources Returns the resource requests/requirements for running a single IPFS Container
 // depending on the storage requested by the user.
 func IPFSContainerResources(ipfsStorageBytes int64) (ipfsResources corev1.ResourceRequirements) {
-
 	// Determine resource constraints from how much we are storing.
 	// for every TB of storage, Request 1GB of memory and limit if we exceed 2x this amount.
 	// memory floor is 2G.
@@ -55,17 +55,22 @@ func IPFSContainerResources(ipfsStorageBytes int64) (ipfsResources corev1.Resour
 	// biggest node we would allocate would request a minimum allocation of 16G of RAM and 12 cores
 	// and would permit usage up to twice this size
 
-	ipfsStorageTB := ipfsStorageBytes / 1024 / 1024 / 1024 / 1024
+	ipfsStorageTB := ipfsStorageBytes / int64(units.Tebibyte)
 	ipfsMilliCoresMin := 250 + (500 * ipfsStorageTB)
 	ipfsRAMGBMin := ipfsStorageTB
 	if ipfsRAMGBMin < 2 {
-		ipfsRAMGBMin = 2
+		ipfsRAMGBMin = 1
 	}
 
+	// // ipfsRAMMinQuantity := resource.NewScaledQuantity(ipfsRAMGBMin, resource.Giga)
+	// ipfsRAMMaxQuantity := resource.NewScaledQuantity(2*ipfsRAMGBMin, resource.Giga)
+	// // ipfsCoresMinQuantity := resource.NewScaledQuantity(ipfsMilliCoresMin, resource.Milli)
+	// ipfsCoresMaxQuantity := resource.NewScaledQuantity(2*ipfsMilliCoresMin, resource.Milli)
+
 	// ipfsRAMMinQuantity := resource.NewScaledQuantity(ipfsRAMGBMin, resource.Giga)
-	ipfsRAMMaxQuantity := resource.NewScaledQuantity(2*ipfsRAMGBMin, resource.Giga)
+	ipfsRAMMaxQuantity := resource.NewScaledQuantity(ipfsRAMGBMin, resource.Giga)
 	// ipfsCoresMinQuantity := resource.NewScaledQuantity(ipfsMilliCoresMin, resource.Milli)
-	ipfsCoresMaxQuantity := resource.NewScaledQuantity(2*ipfsMilliCoresMin, resource.Milli)
+	ipfsCoresMaxQuantity := resource.NewScaledQuantity(ipfsMilliCoresMin, resource.Milli)
 
 	ipfsResources = corev1.ResourceRequirements{
 		// Requests: corev1.ResourceList{

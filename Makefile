@@ -1,6 +1,4 @@
-# Ensure that make is using bash
-SHELL := /bin/bash
-
+# set binary versions
 GOLANGCI_VERSION := v1.46.1
 HELM_VERSION := v3.8.2
 KUTTL_VERSION := 0.10.0

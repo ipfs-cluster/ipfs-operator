@@ -20,17 +20,6 @@ jobs:
     runs-on: ubuntu-20.04
 
     steps:
-      - name: Check shell
-        run: |
-          # get the current shell
-
-          current_shell() {
-            currentShell=$(readlink /proc/"${$}"/exe)
-            printf "using shell: %s\n" "${currentShell}"
-            version=$("${currentShell}" --version)
-            printf "shell version: %s\n" "${version}"
-          }
-          current_shell
       - name: Checkout source
         uses: actions/checkout@v2
 
@@ -135,17 +124,6 @@ jobs:
     - name: run e2e tests
       shell: bash
       run: |
-        # get the current shell
-        current_shell() {
-          currentShell=$(readlink /proc/"${$}"/exe)
-          printf "using shell: %s\n" "${currentShell}"
-          version=$("${currentShell}" --version)
-          printf "shell version: %s\n" "${version}"
-        }
-        current_shell
-
-        printf "########################################\navailable shells:\n%s\n" "$(cat /etc/shells)"
-
         mkdir bin
         make test-e2e
 

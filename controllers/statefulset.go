@@ -81,16 +81,16 @@ func (r *IpfsClusterReconciler) statefulSet(m *clusterv1alpha1.IpfsCluster,
 		ipfsRAMGBMin = 2
 	}
 
-	ipfsRAMMinQuantity := resource.NewScaledQuantity(ipfsRAMGBMin, resource.Giga)
+	// ipfsRAMMinQuantity := resource.NewScaledQuantity(ipfsRAMGBMin, resource.Giga)
 	ipfsRAMMaxQuantity := resource.NewScaledQuantity(2*ipfsRAMGBMin, resource.Giga)
-	ipfsCoresMinQuantity := resource.NewScaledQuantity(ipfsMilliCoresMin, resource.Milli)
+	// ipfsCoresMinQuantity := resource.NewScaledQuantity(ipfsMilliCoresMin, resource.Milli)
 	ipfsCoresMaxQuantity := resource.NewScaledQuantity(2*ipfsMilliCoresMin, resource.Milli)
 
 	ipfsResources := corev1.ResourceRequirements{
-		Requests: corev1.ResourceList{
-			corev1.ResourceMemory: *ipfsRAMMinQuantity,
-			corev1.ResourceCPU:    *ipfsCoresMinQuantity,
-		},
+		// Requests: corev1.ResourceList{
+		// 	corev1.ResourceMemory: *ipfsRAMMinQuantity,
+		// 	corev1.ResourceCPU:    *ipfsCoresMinQuantity,
+		// },
 		Limits: corev1.ResourceList{
 			corev1.ResourceMemory: *ipfsRAMMaxQuantity,
 			corev1.ResourceCPU:    *ipfsCoresMaxQuantity,

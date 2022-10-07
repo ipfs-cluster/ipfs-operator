@@ -75,7 +75,7 @@ func (r *IpfsClusterReconciler) statefulSet(m *clusterv1alpha1.IpfsCluster,
 
 	ipfsStoragei64, _ := m.Spec.IpfsStorage.AsInt64()
 	ipfsStorageTB := ipfsStoragei64 / 1024 / 1024 / 1024 / 1024
-	ipfsMilliCoresMin := 4000 + (500 * ipfsStorageTB)
+	ipfsMilliCoresMin := 250 + (500 * ipfsStorageTB)
 	ipfsRAMGBMin := ipfsStorageTB
 	if ipfsRAMGBMin < 2 {
 		ipfsRAMGBMin = 2

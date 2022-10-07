@@ -10,5 +10,9 @@ spec:
   public: false
   replicas: 2
   follows: []
+  ipfsResources:
+    limits:
+      cpu: 250m
+      memory: 512M
   networking:
     circuitRelays: 0

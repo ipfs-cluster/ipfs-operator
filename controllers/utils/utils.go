@@ -62,21 +62,16 @@ func IPFSContainerResources(ipfsStorageBytes int64) (ipfsResources corev1.Resour
 		ipfsRAMGBMin = 1
 	}
 
-	// // ipfsRAMMinQuantity := resource.NewScaledQuantity(ipfsRAMGBMin, resource.Giga)
-	// ipfsRAMMaxQuantity := resource.NewScaledQuantity(2*ipfsRAMGBMin, resource.Giga)
-	// // ipfsCoresMinQuantity := resource.NewScaledQuantity(ipfsMilliCoresMin, resource.Milli)
-	// ipfsCoresMaxQuantity := resource.NewScaledQuantity(2*ipfsMilliCoresMin, resource.Milli)
-
-	// ipfsRAMMinQuantity := resource.NewScaledQuantity(ipfsRAMGBMin, resource.Giga)
-	ipfsRAMMaxQuantity := resource.NewScaledQuantity(ipfsRAMGBMin, resource.Giga)
-	// ipfsCoresMinQuantity := resource.NewScaledQuantity(ipfsMilliCoresMin, resource.Milli)
-	ipfsCoresMaxQuantity := resource.NewScaledQuantity(ipfsMilliCoresMin, resource.Milli)
+	ipfsRAMMinQuantity := resource.NewScaledQuantity(ipfsRAMGBMin, resource.Giga)
+	ipfsRAMMaxQuantity := resource.NewScaledQuantity(2*ipfsRAMGBMin, resource.Giga)
+	ipfsCoresMinQuantity := resource.NewScaledQuantity(ipfsMilliCoresMin, resource.Milli)
+	ipfsCoresMaxQuantity := resource.NewScaledQuantity(2*ipfsMilliCoresMin, resource.Milli)
 
 	ipfsResources = corev1.ResourceRequirements{
-		// Requests: corev1.ResourceList{
-		// 	corev1.ResourceMemory: *ipfsRAMMinQuantity,
-		// 	corev1.ResourceCPU:    *ipfsCoresMinQuantity,
-		// },
+		Requests: corev1.ResourceList{
+			corev1.ResourceMemory: *ipfsRAMMinQuantity,
+			corev1.ResourceCPU:    *ipfsCoresMinQuantity,
+		},
 		Limits: corev1.ResourceList{
 			corev1.ResourceMemory: *ipfsRAMMaxQuantity,
 			corev1.ResourceCPU:    *ipfsCoresMaxQuantity,

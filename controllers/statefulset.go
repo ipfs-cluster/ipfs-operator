@@ -66,7 +66,14 @@ func (r *IpfsClusterReconciler) statefulSet(m *clusterv1alpha1.IpfsCluster,
 ) controllerutil.MutateFn {
 	ssName := "ipfs-cluster-" + m.Name
 
-	ipfsResources := utils.IPFSContainerResources(m.Spec.IpfsStorage.Value())
+	//
+	var ipfsResources corev1.ResourceRequirements
+	if m.Spec.IPFSResources == nil {
+		ipfsResources = *m.Spec.IPFSResources
+	} else {
+		ipfsResources = utils.IPFSContainerResources(m.Spec.IpfsStorage.Value())
+	}
+
 	expected := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      ssName,

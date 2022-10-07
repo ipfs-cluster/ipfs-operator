@@ -4,6 +4,8 @@ import (
 	"context"
 
 	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
@@ -39,4 +41,41 @@ func ErrFunc(err error) controllerutil.MutateFn {
 	return func() error {
 		return err
 	}
+}
+
+// IPFSContainerResources Returns the resource requests/requirements for running a single IPFS Container
+// depending on the storage requested by the user.
+func IPFSContainerResources(ipfsStorageBytes int64) (ipfsResources corev1.ResourceRequirements) {
+
+	// Determine resource constraints from how much we are storing.
+	// for every TB of storage, Request 1GB of memory and limit if we exceed 2x this amount.
+	// memory floor is 2G.
+	// The CPU requirement starts at 4 cores and increases by 500m for every TB of storage
+	// many block storage providers have a maximum block storage of 16TB, so in this case, the
+	// biggest node we would allocate would request a minimum allocation of 16G of RAM and 12 cores
+	// and would permit usage up to twice this size
+
+	ipfsStorageTB := ipfsStorageBytes / 1024 / 1024 / 1024 / 1024
+	ipfsMilliCoresMin := 250 + (500 * ipfsStorageTB)
+	ipfsRAMGBMin := ipfsStorageTB
+	if ipfsRAMGBMin < 2 {
+		ipfsRAMGBMin = 2
+	}
+
+	// ipfsRAMMinQuantity := resource.NewScaledQuantity(ipfsRAMGBMin, resource.Giga)
+	ipfsRAMMaxQuantity := resource.NewScaledQuantity(2*ipfsRAMGBMin, resource.Giga)
+	// ipfsCoresMinQuantity := resource.NewScaledQuantity(ipfsMilliCoresMin, resource.Milli)
+	ipfsCoresMaxQuantity := resource.NewScaledQuantity(2*ipfsMilliCoresMin, resource.Milli)
+
+	ipfsResources = corev1.ResourceRequirements{
+		// Requests: corev1.ResourceList{
+		// 	corev1.ResourceMemory: *ipfsRAMMinQuantity,
+		// 	corev1.ResourceCPU:    *ipfsCoresMinQuantity,
+		// },
+		Limits: corev1.ResourceList{
+			corev1.ResourceMemory: *ipfsRAMMaxQuantity,
+			corev1.ResourceCPU:    *ipfsCoresMaxQuantity,
+		},
+	}
+	return
 }

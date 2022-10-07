@@ -13,6 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	clusterv1alpha1 "github.com/redhat-et/ipfs-operator/api/v1alpha1"
+	"github.com/redhat-et/ipfs-operator/controllers/utils"
 )
 
 // These declare constants for timeouts.
@@ -65,38 +66,7 @@ func (r *IpfsClusterReconciler) statefulSet(m *clusterv1alpha1.IpfsCluster,
 ) controllerutil.MutateFn {
 	ssName := "ipfs-cluster-" + m.Name
 
-	// Determine resource constraints from how much we are storing.
-	// for every TB of storage, Request 1GB of memory and limit if we exceed 2x this amount.
-	// memory floor is 2G.
-	// The CPU requirement starts at 4 cores and increases by 500m for every TB of storage
-	// many block storage providers have a maximum block storage of 16TB, so in this case, the
-	// biggest node we would allocate would request a minimum allocation of 16G of RAM and 12 cores
-	// and would permit usage up to twice this size
-
-	ipfsStoragei64, _ := m.Spec.IpfsStorage.AsInt64()
-	ipfsStorageTB := ipfsStoragei64 / 1024 / 1024 / 1024 / 1024
-	ipfsMilliCoresMin := 250 + (500 * ipfsStorageTB)
-	ipfsRAMGBMin := ipfsStorageTB
-	if ipfsRAMGBMin < 2 {
-		ipfsRAMGBMin = 2
-	}
-
-	// ipfsRAMMinQuantity := resource.NewScaledQuantity(ipfsRAMGBMin, resource.Giga)
-	ipfsRAMMaxQuantity := resource.NewScaledQuantity(2*ipfsRAMGBMin, resource.Giga)
-	// ipfsCoresMinQuantity := resource.NewScaledQuantity(ipfsMilliCoresMin, resource.Milli)
-	ipfsCoresMaxQuantity := resource.NewScaledQuantity(2*ipfsMilliCoresMin, resource.Milli)
-
-	ipfsResources := corev1.ResourceRequirements{
-		// Requests: corev1.ResourceList{
-		// 	corev1.ResourceMemory: *ipfsRAMMinQuantity,
-		// 	corev1.ResourceCPU:    *ipfsCoresMinQuantity,
-		// },
-		Limits: corev1.ResourceList{
-			corev1.ResourceMemory: *ipfsRAMMaxQuantity,
-			corev1.ResourceCPU:    *ipfsCoresMaxQuantity,
-		},
-	}
-
+	ipfsResources := utils.IPFSContainerResources(m.Spec.IpfsStorage.Value())
 	expected := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      ssName,

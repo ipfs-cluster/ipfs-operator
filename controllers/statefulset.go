@@ -6,7 +6,6 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -36,6 +35,13 @@ const (
 	portHTTP         = 8080
 )
 
+// Defines common names
+const (
+	ContainerIPFS        = "ipfs"
+	ContainerIPFSCluster = "ipfs-cluster"
+	ContainerInitIPFS    = "configure-ipfs"
+)
+
 // Misclaneous constants.
 const (
 	// notDNSPattern Defines a ReGeX pattern to match non-DNS names.
@@ -51,14 +57,12 @@ const (
 	ipfsImage = "docker.io/ipfs/kubo:v0.14.0"
 )
 
-// statefulSet Returns a mutate function that creates a statefulSet for the
+// StatefulSet Returns a mutate function that creates a StatefulSet for the
 // given IPFS cluster.
 // FIXME: break this function up to use createOrUpdate and set values in the struct line-by-line
 //
-//	instead of setting the entire thing all at once.
-//
 // nolint:funlen // Function is long due to Kube resource definitions
-func (r *IpfsClusterReconciler) statefulSet(m *clusterv1alpha1.IpfsCluster,
+func (r *IpfsClusterReconciler) StatefulSet(m *clusterv1alpha1.IpfsCluster,
 	sts *appsv1.StatefulSet,
 	serviceName string,
 	secretName string,
@@ -68,7 +72,7 @@ func (r *IpfsClusterReconciler) statefulSet(m *clusterv1alpha1.IpfsCluster,
 
 	//
 	var ipfsResources corev1.ResourceRequirements
-	if m.Spec.IPFSResources == nil {
+	if m.Spec.IPFSResources != nil {
 		ipfsResources = *m.Spec.IPFSResources
 	} else {
 		ipfsResources = utils.IPFSContainerResources(m.Spec.IpfsStorage.Value())
@@ -96,7 +100,7 @@ func (r *IpfsClusterReconciler) statefulSet(m *clusterv1alpha1.IpfsCluster,
 					ServiceAccountName: ssName,
 					InitContainers: []corev1.Container{
 						{
-							Name:  "configure-ipfs",
+							Name:  ContainerInitIPFS,
 							Image: ipfsImage,
 							Command: []string{
 								"sh",
@@ -120,7 +124,7 @@ func (r *IpfsClusterReconciler) statefulSet(m *clusterv1alpha1.IpfsCluster,
 					},
 					Containers: []corev1.Container{
 						{
-							Name:            "ipfs",
+							Name:            ContainerIPFS,
 							Image:           ipfsImage,
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							Env: []corev1.EnvVar{
@@ -175,7 +179,7 @@ func (r *IpfsClusterReconciler) statefulSet(m *clusterv1alpha1.IpfsCluster,
 							Resources: ipfsResources,
 						},
 						{
-							Name:            "ipfs-cluster",
+							Name:            ContainerIPFSCluster,
 							Image:           ipfsClusterImage,
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							Command: []string{
@@ -301,7 +305,7 @@ func (r *IpfsClusterReconciler) statefulSet(m *clusterv1alpha1.IpfsCluster,
 						},
 						Resources: corev1.ResourceRequirements{
 							Requests: corev1.ResourceList{
-								corev1.ResourceStorage: resource.MustParse(m.Spec.ClusterStorage),
+								corev1.ResourceStorage: m.Spec.ClusterStorage,
 							},
 						},
 					},

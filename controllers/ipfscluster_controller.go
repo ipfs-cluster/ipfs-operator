@@ -152,7 +152,7 @@ func (r *IpfsClusterReconciler) createTrackedObjects(
 		[]byte(privateString),
 		peerID.String(),
 	)
-	mutSts := r.statefulSet(instance, &sts, svcName, secConfigName, cmScriptName)
+	mutSts := r.StatefulSet(instance, &sts, svcName, secConfigName, cmScriptName)
 
 	trackedObjects := map[client.Object]controllerutil.MutateFn{
 		&sa:        mutsa,

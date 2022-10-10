@@ -22,3 +22,5 @@ main() {
   ipfsCommand="ipfs get --output /tmp/myfile.txt -- ${myCID}" 
   kubectl exec -n "${NAMESPACE}" "${ipfsClusterPodname2}" -c ipfs -- sh -c "${ipfsCommand}"
 }
+
+main

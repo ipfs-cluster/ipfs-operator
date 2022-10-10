@@ -75,7 +75,7 @@ type IpfsClusterSpec struct {
 	// ipfsStorage defines the total storage to be allocated by this resource.
 	IpfsStorage resource.Quantity `json:"ipfsStorage"`
 	// clusterStorage defines the amount of storage to be used by IPFS Cluster.
-	ClusterStorage string `json:"clusterStorage"`
+	ClusterStorage resource.Quantity `json:"clusterStorage"`
 	// replicas sets the number of replicas of IPFS Cluster nodes we should be running.
 	Replicas int32 `json:"replicas"`
 	// networking defines network configuration settings.

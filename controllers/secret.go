@@ -28,7 +28,7 @@ func errorFunc(err error) controllerutil.MutateFn {
 	}
 }
 
-func (r *IpfsClusterReconciler) secretConfig(
+func (r *IpfsClusterReconciler) SecretConfig(
 	ctx context.Context,
 	m *clusterv1alpha1.IpfsCluster,
 	sec *corev1.Secret,
@@ -45,32 +45,33 @@ func (r *IpfsClusterReconciler) secretConfig(
 	}
 	// find secret
 	err := r.Get(ctx, client.ObjectKeyFromObject(expectedSecret), expectedSecret)
-	if err != nil && !errors.IsNotFound(err) {
-		return errorFunc(err), ""
-	}
-	// initialize the secret, if needed
-	if err != nil && errors.IsNotFound(err) {
+	if err != nil {
+		// test for unhandled errors
+		if !errors.IsNotFound(err) {
+			return errorFunc(err), ""
+		}
+		// secret is not found.
+		// initialize new secret
 		expectedSecret.Data = make(map[string][]byte, 0)
-		expectedSecret.StringData = make(map[string]string, 0)
-		// secret doesn't exist
 		err = generateNewIdentities(expectedSecret, 0, m.Spec.Replicas)
 		if err != nil {
 			return errorFunc(err), ""
 		}
 		expectedSecret.Data["CLUSTER_SECRET"] = clusterSecret
 		expectedSecret.Data["BOOTSTRAP_PEER_PRIV_KEY"] = bootstrapPrivateKey
-	}
-
-	// secret does exist
-	numIdentities := countIdentities(expectedSecret)
-	if numIdentities != m.Spec.Replicas {
-		// create more identities if needed, otherwise they will be reused
-		// when scaling down and then up again
-		if numIdentities < m.Spec.Replicas {
-			// create more
-			err = generateNewIdentities(expectedSecret, numIdentities, m.Spec.Replicas)
-			if err != nil {
-				return errorFunc(err), ""
+	} else {
+		// secret exists.
+		// test if we need to add more identieis
+		numIdentities := countIdentities(expectedSecret)
+		if numIdentities != m.Spec.Replicas {
+			// create more identities if needed, otherwise they will be reused
+			// when scaling down and then up again
+			if numIdentities < m.Spec.Replicas {
+				// create more
+				err = generateNewIdentities(expectedSecret, numIdentities, m.Spec.Replicas)
+				if err != nil {
+					return errorFunc(err), ""
+				}
 			}
 		}
 	}
@@ -82,6 +83,7 @@ func (r *IpfsClusterReconciler) secretConfig(
 	}
 	return func() error {
 		sec.Data = expectedSecret.Data
+		sec.StringData = expectedSecret.StringData
 		return nil
 	}, secName
 }
@@ -100,6 +102,9 @@ func countIdentities(secret *corev1.Secret) int32 {
 // generateNewIdentities Populates the secret data with new Peer IDs
 // and private keys which are mapped based on the replica number.
 func generateNewIdentities(secret *corev1.Secret, start, n int32) error {
+	if secret.StringData == nil {
+		secret.StringData = make(map[string]string, 0)
+	}
 	for i := start; i < n; i++ {
 		// generate new private key & peer id
 		peerID, privKey, err := generateIdentity()

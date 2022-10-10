@@ -8,9 +8,9 @@ spec:
   ipfsStorage: 5Ti
   clusterStorage: 20Gi
   clusterApi:
-    strategy: none
+    strategy: loadbalancer
   gateway:
-    strategy: none
+    strategy: loadbalancer
   public: true
   replicas: 5
   follows:

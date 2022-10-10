@@ -72,7 +72,6 @@ func (r *IpfsClusterReconciler) statefulSet(m *clusterv1alpha1.IpfsCluster,
 	sts *appsv1.StatefulSet,
 	serviceName string,
 	secretName string,
-	configMapName string,
 	configMapBootstrapScriptName string,
 ) controllerutil.MutateFn {
 	ssName := "ipfs-cluster-" + m.Name
@@ -226,9 +225,9 @@ func (r *IpfsClusterReconciler) statefulSet(m *clusterv1alpha1.IpfsCluster,
 								{
 									Name: "BOOTSTRAP_PEER_ID",
 									ValueFrom: &corev1.EnvVarSource{
-										ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+										SecretKeyRef: &corev1.SecretKeySelector{
 											LocalObjectReference: corev1.LocalObjectReference{
-												Name: configMapName,
+												Name: secretName,
 											},
 											Key: "BOOTSTRAP_PEER_ID",
 										},

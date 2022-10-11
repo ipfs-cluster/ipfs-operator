@@ -113,7 +113,7 @@ func (r *IpfsClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		}
 		if relay.Status.AddrInfo.ID == "" {
 			log.Info("relay is not ready yet. Will continue waiting.", "relay", relayName)
-			return ctrl.Result{RequeueAfter: time.Minute}, nil
+			return ctrl.Result{RequeueAfter: time.Second * 15}, nil
 		}
 	}
 	if err = r.Status().Update(ctx, instance); err != nil {
@@ -137,7 +137,6 @@ func (r *IpfsClusterReconciler) createTrackedObjects(
 	sa := corev1.ServiceAccount{}
 	svc := corev1.Service{}
 	cmScripts := corev1.ConfigMap{}
-	cmConfig := corev1.ConfigMap{}
 	secConfig := corev1.Secret{}
 	sts := appsv1.StatefulSet{}
 
@@ -145,15 +144,20 @@ func (r *IpfsClusterReconciler) createTrackedObjects(
 	mutsvc, svcName := r.serviceCluster(instance, &svc)
 
 	mutCmScripts, cmScriptName := r.ConfigMapScripts(ctx, instance, &cmScripts)
-	mutSecConfig, secConfigName := r.SecretConfig(ctx, instance, &secConfig, []byte(clusterSecret), []byte(privateString))
-	mutCmConfig, cmConfigName := r.configMapConfig(instance, &cmConfig, peerID.String())
-	mutSts := r.statefulSet(instance, &sts, svcName, secConfigName, cmConfigName, cmScriptName)
+	mutSecConfig, secConfigName := r.SecretConfig(
+		ctx,
+		instance,
+		&secConfig,
+		[]byte(clusterSecret),
+		[]byte(privateString),
+		peerID.String(),
+	)
+	mutSts := r.StatefulSet(instance, &sts, svcName, secConfigName, cmScriptName)
 
 	trackedObjects := map[client.Object]controllerutil.MutateFn{
 		&sa:        mutsa,
 		&svc:       mutsvc,
 		&cmScripts: mutCmScripts,
-		&cmConfig:  mutCmConfig,
 		&secConfig: mutSecConfig,
 		&sts:       mutSts,
 	}

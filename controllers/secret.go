@@ -34,6 +34,7 @@ func (r *IpfsClusterReconciler) SecretConfig(
 	sec *corev1.Secret,
 	clusterSecret,
 	bootstrapPrivateKey []byte,
+	peerID string,
 ) (controllerutil.MutateFn, string) {
 	secName := "ipfs-cluster-" + m.Name
 
@@ -59,6 +60,7 @@ func (r *IpfsClusterReconciler) SecretConfig(
 		}
 		expectedSecret.Data["CLUSTER_SECRET"] = clusterSecret
 		expectedSecret.Data["BOOTSTRAP_PEER_PRIV_KEY"] = bootstrapPrivateKey
+		expectedSecret.StringData["BOOTSTRAP_PEER_ID"] = peerID
 	} else {
 		// secret exists.
 		// test if we need to add more identieis

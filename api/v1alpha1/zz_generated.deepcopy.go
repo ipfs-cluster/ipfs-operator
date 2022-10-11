@@ -22,7 +22,8 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -179,11 +180,17 @@ func (in *IpfsClusterList) DeepCopyObject() runtime.Object {
 func (in *IpfsClusterSpec) DeepCopyInto(out *IpfsClusterSpec) {
 	*out = *in
 	out.IpfsStorage = in.IpfsStorage.DeepCopy()
+	out.ClusterStorage = in.ClusterStorage.DeepCopy()
 	out.Networking = in.Networking
 	if in.Follows != nil {
 		in, out := &in.Follows, &out.Follows
 		*out = make([]followParams, len(*in))
 		copy(*out, *in)
+	}
+	if in.IPFSResources != nil {
+		in, out := &in.IPFSResources, &out.IPFSResources
+		*out = new(v1.ResourceRequirements)
+		(*in).DeepCopyInto(*out)
 	}
 	out.Reprovider = in.Reprovider
 }
@@ -203,7 +210,7 @@ func (in *IpfsClusterStatus) DeepCopyInto(out *IpfsClusterStatus) {
 	*out = *in
 	if in.Conditions != nil {
 		in, out := &in.Conditions, &out.Conditions
-		*out = make([]v1.Condition, len(*in))
+		*out = make([]metav1.Condition, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}

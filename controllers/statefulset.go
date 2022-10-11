@@ -6,13 +6,13 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	clusterv1alpha1 "github.com/redhat-et/ipfs-operator/api/v1alpha1"
+	"github.com/redhat-et/ipfs-operator/controllers/utils"
 )
 
 // These declare constants for timeouts.
@@ -35,6 +35,13 @@ const (
 	portHTTP         = 8080
 )
 
+// Defines common names
+const (
+	ContainerIPFS        = "ipfs"
+	ContainerIPFSCluster = "ipfs-cluster"
+	ContainerInitIPFS    = "configure-ipfs"
+)
+
 // Misclaneous constants.
 const (
 	// notDNSPattern Defines a ReGeX pattern to match non-DNS names.
@@ -50,54 +57,25 @@ const (
 	ipfsImage = "docker.io/ipfs/kubo:v0.14.0"
 )
 
-// statefulSet Returns a mutate function that creates a statefulSet for the
+// StatefulSet Returns a mutate function that creates a StatefulSet for the
 // given IPFS cluster.
 // FIXME: break this function up to use createOrUpdate and set values in the struct line-by-line
 //
-//	instead of setting the entire thing all at once.
-//
 // nolint:funlen // Function is long due to Kube resource definitions
-func (r *IpfsClusterReconciler) statefulSet(m *clusterv1alpha1.IpfsCluster,
+func (r *IpfsClusterReconciler) StatefulSet(m *clusterv1alpha1.IpfsCluster,
 	sts *appsv1.StatefulSet,
 	serviceName string,
 	secretName string,
-	configMapName string,
 	configMapBootstrapScriptName string,
 ) controllerutil.MutateFn {
 	ssName := "ipfs-cluster-" + m.Name
 
+	//
 	var ipfsResources corev1.ResourceRequirements
-
-	// Determine resource constraints from how much we are storing.
-	// for every TB of storage, Request 1GB of memory and limit if we exceed 2x this amount.
-	// memory floor is 2G.
-	// The CPU requirement starts at 4 cores and increases by 500m for every TB of storage
-	// many block storage providers have a maximum block storage of 16TB, so in this case, the
-	// biggest node we would allocate would request a minimum allocation of 16G of RAM and 12 cores
-	// and would permit usage up to twice this size
-
-	ipfsStoragei64, _ := m.Spec.IpfsStorage.AsInt64()
-	ipfsStorageTB := ipfsStoragei64 / 1024 / 1024 / 1024 / 1024
-	ipfsMilliCoresMin := 4000 + (500 * ipfsStorageTB)
-	ipfsRAMGBMin := ipfsStorageTB
-	if ipfsRAMGBMin < 2 {
-		ipfsRAMGBMin = 2
-	}
-
-	ipfsRAMMinQuantity := resource.NewScaledQuantity(ipfsRAMGBMin, resource.Giga)
-	ipfsRAMMaxQuantity := resource.NewScaledQuantity(2*ipfsRAMGBMin, resource.Giga)
-	ipfsCoresMinQuantity := resource.NewScaledQuantity(ipfsMilliCoresMin, resource.Milli)
-	ipfsCoresMaxQuantity := resource.NewScaledQuantity(2*ipfsMilliCoresMin, resource.Milli)
-
-	ipfsResources = corev1.ResourceRequirements{
-		Requests: corev1.ResourceList{
-			corev1.ResourceMemory: *ipfsRAMMinQuantity,
-			corev1.ResourceCPU:    *ipfsCoresMinQuantity,
-		},
-		Limits: corev1.ResourceList{
-			corev1.ResourceMemory: *ipfsRAMMaxQuantity,
-			corev1.ResourceCPU:    *ipfsCoresMaxQuantity,
-		},
+	if m.Spec.IPFSResources != nil {
+		ipfsResources = *m.Spec.IPFSResources
+	} else {
+		ipfsResources = utils.IPFSContainerResources(m.Spec.IpfsStorage.Value())
 	}
 
 	expected := &appsv1.StatefulSet{
@@ -122,7 +100,7 @@ func (r *IpfsClusterReconciler) statefulSet(m *clusterv1alpha1.IpfsCluster,
 					ServiceAccountName: ssName,
 					InitContainers: []corev1.Container{
 						{
-							Name:  "configure-ipfs",
+							Name:  ContainerInitIPFS,
 							Image: ipfsImage,
 							Command: []string{
 								"sh",
@@ -146,7 +124,7 @@ func (r *IpfsClusterReconciler) statefulSet(m *clusterv1alpha1.IpfsCluster,
 					},
 					Containers: []corev1.Container{
 						{
-							Name:            "ipfs",
+							Name:            ContainerIPFS,
 							Image:           ipfsImage,
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							Env: []corev1.EnvVar{
@@ -201,7 +179,7 @@ func (r *IpfsClusterReconciler) statefulSet(m *clusterv1alpha1.IpfsCluster,
 							Resources: ipfsResources,
 						},
 						{
-							Name:            "ipfs-cluster",
+							Name:            ContainerIPFSCluster,
 							Image:           ipfsClusterImage,
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							Command: []string{
@@ -215,9 +193,9 @@ func (r *IpfsClusterReconciler) statefulSet(m *clusterv1alpha1.IpfsCluster,
 								{
 									Name: "BOOTSTRAP_PEER_ID",
 									ValueFrom: &corev1.EnvVarSource{
-										ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+										SecretKeyRef: &corev1.SecretKeySelector{
 											LocalObjectReference: corev1.LocalObjectReference{
-												Name: configMapName,
+												Name: secretName,
 											},
 											Key: "BOOTSTRAP_PEER_ID",
 										},
@@ -327,7 +305,7 @@ func (r *IpfsClusterReconciler) statefulSet(m *clusterv1alpha1.IpfsCluster,
 						},
 						Resources: corev1.ResourceRequirements{
 							Requests: corev1.ResourceList{
-								corev1.ResourceStorage: resource.MustParse(m.Spec.ClusterStorage),
+								corev1.ResourceStorage: m.Spec.ClusterStorage,
 							},
 						},
 					},

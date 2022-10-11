@@ -5,7 +5,7 @@ kind: TestAssert
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: ipfs-cluster-ipfs-sample-1 
+  name: ipfs-cluster-cluster-1
 status:
-  currentReplicas: 2
-  readyReplicas: 2
+  currentReplicas: 1
+  readyReplicas: 1

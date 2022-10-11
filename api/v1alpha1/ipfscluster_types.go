@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -59,20 +60,34 @@ type followParams struct {
 	Template string `json:"template"`
 }
 
+// networkConfig defines the configuration structure used for networking.
 type networkConfig struct {
 	CircuitRelays int32 `json:"circuitRelays"`
 }
 
+// IpfsClusterSpec defines the desired state of the IpfsCluster.
 type IpfsClusterSpec struct {
+	// url defines the URL to be using as an ingress controller.
 	// +kubebuilder:validation:Optional
-	URL            string            `json:"url"`
-	Public         bool              `json:"public"`
-	IpfsStorage    resource.Quantity `json:"ipfsStorage"`
-	ClusterStorage string            `json:"clusterStorage"`
-	Replicas       int32             `json:"replicas"`
-	Networking     networkConfig     `json:"networking"`
-	Follows        []followParams    `json:"follows"`
-	// Reprovider Describes the settings that each IPFS node
+	URL string `json:"url"`
+	// public determines whether or not we should be exposing this IPFS Cluster to the public.
+	Public bool `json:"public"`
+	// ipfsStorage defines the total storage to be allocated by this resource.
+	IpfsStorage resource.Quantity `json:"ipfsStorage"`
+	// clusterStorage defines the amount of storage to be used by IPFS Cluster.
+	ClusterStorage resource.Quantity `json:"clusterStorage"`
+	// replicas sets the number of replicas of IPFS Cluster nodes we should be running.
+	Replicas int32 `json:"replicas"`
+	// networking defines network configuration settings.
+	Networking networkConfig `json:"networking"`
+	// follows defines the list of other IPFS Clusters this one should follow.
+	Follows []followParams `json:"follows"`
+	// ipfsResources specifies the resource requirements for each IPFS container. If this
+	// value is omitted, then the operator will automatically determine these settings
+	// based on the storage sizes used.
+	// +optional
+	IPFSResources *corev1.ResourceRequirements `json:"ipfsResources,omitempty"`
+	// reprovider Describes the settings that each IPFS node
 	// should use when reproviding content.
 	// +optional
 	Reprovider ReprovideSettings `json:"reprovider,omitempty"`

@@ -44,6 +44,17 @@ const (
 	ReproviderStrategyRoots ReproviderStrategy = "roots"
 )
 
+type NetworkMode string
+
+const (
+	// NetworkModePublic Defines an IPFSCluster running in public mode with its
+	// content available to everyone.
+	NetworkModePublic NetworkMode = "public"
+	// NetworkModePrivate Defines an IPFSCluster running in a private network
+	// with its content only available to other authorized nodes.
+	NetworkModePrivate NetworkMode = "private"
+)
+
 type ReprovideSettings struct {
 	// Strategy specifies the reprovider strategy, defaults to 'all'.
 	// +kubebuilder:validation:Enum={all,pinned,roots}
@@ -60,9 +71,14 @@ type followParams struct {
 	Template string `json:"template"`
 }
 
-// networkConfig defines the configuration structure used for networking.
-type networkConfig struct {
+// NetworkConfig defines the configuration structure used for networking.
+type NetworkConfig struct {
+	// circuitRelays defines how many CircuitRelays should be created.
 	CircuitRelays int32 `json:"circuitRelays"`
+	// networkMode is a switch which defines whether this IPFSCluster will use
+	// the global IPFS network or create its own.
+	// +kubebuilder:validation:Enum={public,private}
+	NetworkMode NetworkMode `json:"networkMode,omitempty"`
 }
 
 // IpfsClusterSpec defines the desired state of the IpfsCluster.
@@ -74,7 +90,7 @@ type IpfsClusterSpec struct {
 	// replicas sets the number of replicas of IPFS Cluster nodes we should be running.
 	Replicas int32 `json:"replicas"`
 	// networking defines network configuration settings.
-	Networking networkConfig `json:"networking"`
+	Networking NetworkConfig `json:"networking"`
 	// follows defines the list of other IPFS Clusters this one should follow.
 	Follows []followParams `json:"follows"`
 	// ipfsResources specifies the resource requirements for each IPFS container. If this

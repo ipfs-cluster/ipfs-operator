@@ -36,9 +36,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	"github.com/libp2p/go-libp2p-core/crypto"
-	peer "github.com/libp2p/go-libp2p-core/peer"
 	relaydaemon "github.com/libp2p/go-libp2p-relay-daemon"
+	"github.com/libp2p/go-libp2p/core/crypto"
+	peer "github.com/libp2p/go-libp2p/core/peer"
 	relayv2 "github.com/libp2p/go-libp2p/p2p/protocol/circuitv2/relay"
 	clusterv1alpha1 "github.com/redhat-et/ipfs-operator/api/v1alpha1"
 	"github.com/redhat-et/ipfs-operator/controllers/utils"
@@ -181,7 +181,7 @@ func (r *CircuitRelayReconciler) generateNewIdentity(
 	instance.Status.AddrInfo.Addrs = addrStrings
 	var privkey crypto.PrivKey
 	var pubkey peer.ID
-	privkey, pubkey, err = newKey()
+	privkey, pubkey, err = utils.NewKey()
 	if err != nil {
 		return nil, fmt.Errorf("error during key generation: %w", err)
 	}

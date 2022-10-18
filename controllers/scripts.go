@@ -10,7 +10,7 @@ import (
 
 	"github.com/alecthomas/units"
 	"github.com/ipfs/kubo/config"
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 	ma "github.com/multiformats/go-multiaddr"
 	clusterv1alpha1 "github.com/redhat-et/ipfs-operator/api/v1alpha1"
 	"github.com/redhat-et/ipfs-operator/controllers/scripts"

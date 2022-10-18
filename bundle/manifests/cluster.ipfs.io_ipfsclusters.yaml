@@ -97,8 +97,17 @@ spec:
                 description: networking defines network configuration settings.
                 properties:
                   circuitRelays:
+                    description: circuitRelays defines how many CircuitRelays should
+                      be created.
                     format: int32
                     type: integer
+                  networkMode:
+                    description: networkMode is a switch which defines whether this
+                      IPFSCluster will use the global IPFS network or create its own.
+                    enum:
+                    - public
+                    - private
+                    type: string
                 required:
                 - circuitRelays
                 type: object

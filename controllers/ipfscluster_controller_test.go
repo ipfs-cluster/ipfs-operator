@@ -71,13 +71,10 @@ var _ = Describe("IPFS Reconciler", func() {
 	When("replicas are edited", func() {
 		// we always expect there to be cluster secrets, which have two values
 		const (
-			clusterPeerID = "meow meow meow"
-			alwaysKeys    = 3
+			alwaysKeys = 3
 		)
 		var (
-			clusterSec   = []byte("cluster secret")
-			bootstrapKey = []byte("bootstrap private key")
-			replicas     int32
+			replicas int32
 		)
 		BeforeEach(func() {
 			replicas = rand.Int31n(100)
@@ -85,7 +82,7 @@ var _ = Describe("IPFS Reconciler", func() {
 		})
 		It("creates a new peer ids", func() {
 			secretConfig := &v1.Secret{}
-			fn, _ := ipfsReconciler.SecretConfig(ctx, ipfs, secretConfig, clusterSec, bootstrapKey, clusterPeerID)
+			fn, _ := ipfsReconciler.SecretConfig(ctx, ipfs, secretConfig)
 			Expect(fn()).To(BeNil())
 			secretStringToData(secretConfig)
 			expectedKeys := int(replicas)*2 + alwaysKeys
@@ -93,7 +90,7 @@ var _ = Describe("IPFS Reconciler", func() {
 
 			// increase the replica count. Expect to see new keys generated.
 			ipfs.Spec.Replicas++
-			fn, _ = ipfsReconciler.SecretConfig(ctx, ipfs, secretConfig, clusterSec, bootstrapKey, clusterPeerID)
+			fn, _ = ipfsReconciler.SecretConfig(ctx, ipfs, secretConfig)
 			Expect(fn()).To(BeNil())
 			secretStringToData(secretConfig)
 			Expect(len(secretConfig.Data)).To(Equal(expectedKeys + 2))

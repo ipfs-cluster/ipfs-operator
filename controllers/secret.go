@@ -12,7 +12,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	peer "github.com/libp2p/go-libp2p/core/peer"
 	clusterv1alpha1 "github.com/redhat-et/ipfs-operator/api/v1alpha1"
+	"github.com/redhat-et/ipfs-operator/controllers/utils"
 )
 
 const (
@@ -32,9 +34,9 @@ func (r *IpfsClusterReconciler) SecretConfig(
 	ctx context.Context,
 	m *clusterv1alpha1.IpfsCluster,
 	sec *corev1.Secret,
-	clusterSecret,
-	bootstrapPrivateKey []byte,
-	peerID string,
+	// clusterSecret,
+	// bootstrapPrivateKey []byte,
+	// peerID string,
 ) (controllerutil.MutateFn, string) {
 	secName := "ipfs-cluster-" + m.Name
 
@@ -54,16 +56,25 @@ func (r *IpfsClusterReconciler) SecretConfig(
 		// secret is not found.
 		// initialize new secret
 		expectedSecret.Data = make(map[string][]byte, 0)
+		var clusterSecret, bootstrapPrivateKey string
+		var peerID peer.ID
+		if clusterSecret, err = utils.NewClusterSecret(); err != nil {
+			return errorFunc(err), ""
+		}
+		if peerID, bootstrapPrivateKey, err = utils.GenerateIdentity(); err != nil {
+			return errorFunc(err), ""
+		}
+
 		err = generateNewIdentities(expectedSecret, 0, m.Spec.Replicas)
 		if err != nil {
 			return errorFunc(err), ""
 		}
-		expectedSecret.Data["CLUSTER_SECRET"] = clusterSecret
-		expectedSecret.Data["BOOTSTRAP_PEER_PRIV_KEY"] = bootstrapPrivateKey
-		expectedSecret.StringData["BOOTSTRAP_PEER_ID"] = peerID
+		expectedSecret.Data["CLUSTER_SECRET"] = []byte(clusterSecret)
+		expectedSecret.Data["BOOTSTRAP_PEER_PRIV_KEY"] = []byte(bootstrapPrivateKey)
+		expectedSecret.StringData["BOOTSTRAP_PEER_ID"] = peerID.String()
 	} else {
 		// secret exists.
-		// test if we need to add more identieis
+		// test if we need to add more identities
 		numIdentities := countIdentities(expectedSecret)
 		if numIdentities != m.Spec.Replicas {
 			// create more identities if needed, otherwise they will be reused
@@ -109,7 +120,7 @@ func generateNewIdentities(secret *corev1.Secret, start, n int32) error {
 	}
 	for i := start; i < n; i++ {
 		// generate new private key & peer id
-		peerID, privKey, err := generateIdentity()
+		peerID, privKey, err := utils.GenerateIdentity()
 		if err != nil {
 			return err
 		}

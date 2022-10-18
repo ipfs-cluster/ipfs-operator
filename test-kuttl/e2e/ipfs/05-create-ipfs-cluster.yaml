@@ -4,10 +4,8 @@ kind: IpfsCluster
 metadata:
   name: ipfs-sample-1
 spec:
-  url: example.com
   ipfsStorage: 2Gi
   clusterStorage: 2Gi
-  public: false
   replicas: 2
   follows: []
   ipfsResources:
@@ -15,4 +13,5 @@ spec:
       cpu: 250m
       memory: 512M
   networking:
+    networkMode: public
     circuitRelays: 0

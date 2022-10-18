@@ -48,13 +48,13 @@ const (
 	notDNSPattern = "[[:^alnum:]]"
 	// ipfsClusterImage Defines which container image to use when pulling IPFS Cluster.
 	// HACK: break this up so the version is parameterized, and we can inject the image locally.
-	ipfsClusterImage = "docker.io/ipfs/ipfs-cluster:1.0.2"
+	ipfsClusterImage = "docker.io/ipfs/ipfs-cluster:1.0.4"
 	// ipfsClusterMountPath Defines where the cluster storage volume is mounted.
 	ipfsClusterMountPath = "/data/ipfs-cluster"
 	// ipfsMountPath Defines where the IPFS volume is mounted.
 	ipfsMountPath = "/data/ipfs"
 	// ipfsImage Defines which image we should pull when running IPFS containers.
-	ipfsImage = "docker.io/ipfs/kubo:v0.14.0"
+	ipfsImage = "docker.io/ipfs/kubo:v0.16.0"
 )
 
 // StatefulSet Returns a mutate function that creates a StatefulSet for the

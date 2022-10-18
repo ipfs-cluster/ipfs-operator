@@ -32,7 +32,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
-	"github.com/libp2p/go-libp2p-core/peer"
 	clusterv1alpha1 "github.com/redhat-et/ipfs-operator/api/v1alpha1"
 	"github.com/redhat-et/ipfs-operator/controllers/utils"
 )
@@ -82,20 +81,6 @@ func (r *IpfsClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, r.Update(ctx, instance)
 	}
 
-	// generate a new ID
-	var peerid peer.ID
-	var privStr string
-	if peerid, privStr, err = generateIdentity(); err != nil {
-		log.Error(err, "failed to generate identity")
-		return ctrl.Result{}, err
-	}
-
-	clusSec, err := newClusterSecret()
-	if err != nil {
-		log.Error(err, "cannot generate new cluster secret")
-		return ctrl.Result{}, err
-	}
-
 	if err = r.createCircuitRelays(ctx, instance); err != nil {
 		log.Error(err, "cannot create circuit relays")
 		return ctrl.Result{}, err
@@ -121,7 +106,7 @@ func (r *IpfsClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	// Reconcile the tracked objects
-	trackedObjects := r.createTrackedObjects(ctx, instance, peerid, clusSec, privStr)
+	trackedObjects := r.createTrackedObjects(ctx, instance)
 	shouldRequeue := utils.CreateOrPatchTrackedObjects(ctx, trackedObjects, r.Client, log)
 	return ctrl.Result{Requeue: shouldRequeue}, nil
 }
@@ -130,9 +115,9 @@ func (r *IpfsClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 func (r *IpfsClusterReconciler) createTrackedObjects(
 	ctx context.Context,
 	instance *clusterv1alpha1.IpfsCluster,
-	peerID peer.ID,
-	clusterSecret string,
-	privateString string,
+	// peerID peer.ID,
+	// clusterSecret string,
+	// privateString string,
 ) map[client.Object]controllerutil.MutateFn {
 	sa := corev1.ServiceAccount{}
 	svc := corev1.Service{}
@@ -148,9 +133,9 @@ func (r *IpfsClusterReconciler) createTrackedObjects(
 		ctx,
 		instance,
 		&secConfig,
-		[]byte(clusterSecret),
-		[]byte(privateString),
-		peerID.String(),
+		// []byte(clusterSecret),
+		// []byte(privateString),
+		// peerID.String(),
 	)
 	mutSts := r.StatefulSet(instance, &sts, svcName, secConfigName, cmScriptName)
 

@@ -13,4 +13,3 @@ kind: Kustomization
 images:
 - name: controller
   newName: quay.io/redhat-et-ipfs/ipfs-operator
-  newTag: 0.0.1

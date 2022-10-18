@@ -15,9 +15,10 @@ func (r *IpfsClusterReconciler) serviceCluster(
 	m *clusterv1alpha1.IpfsCluster,
 	svc *corev1.Service,
 ) (controllerutil.MutateFn, string) {
-	svcName := "ipfs-cluster-internal" + m.Name
+	svcName := "ipfs-cluster-internal-" + m.Name
 	expected := expectedService(
 		svcName,
+		m.Name,
 		m.Namespace,
 		"ClusterIP",
 		m.Annotations,
@@ -59,9 +60,10 @@ func (r *IpfsClusterReconciler) serviceGateway(
 	m *clusterv1alpha1.IpfsCluster,
 	svc *corev1.Service,
 ) (controllerutil.MutateFn, string) {
-	svcName := "ipfs-cluster-gateway" + m.Name
+	svcName := "ipfs-cluster-gateway-" + m.Name
 	expected := expectedService(
 		svcName,
+		m.Name,
 		m.Namespace,
 		"LoadBalancer",
 		m.Annotations,
@@ -90,9 +92,10 @@ func (r *IpfsClusterReconciler) serviceAPI(
 	m *clusterv1alpha1.IpfsCluster,
 	svc *corev1.Service,
 ) (controllerutil.MutateFn, string) {
-	svcName := "ipfs-cluster-internal" + m.Name
+	svcName := "ipfs-cluster-api-" + m.Name
 	expected := expectedService(
 		svcName,
+		m.Name,
 		m.Namespace,
 		"LoadBalancer",
 		m.Annotations,
@@ -117,6 +120,7 @@ func (r *IpfsClusterReconciler) serviceAPI(
 }
 
 func expectedService(svcName,
+	relName,
 	namespace string,
 	svcType corev1.ServiceType,
 	annotations map[string]string,
@@ -131,7 +135,7 @@ func expectedService(svcName,
 			Type:  svcType,
 			Ports: ports,
 			Selector: map[string]string{
-				"app.kubernetes.io/name": "ipfs-cluster-" + svcName,
+				"app.kubernetes.io/name": "ipfs-cluster-" + relName,
 			},
 		},
 	}

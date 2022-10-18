@@ -113,7 +113,7 @@ func (r *IpfsClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		}
 		if relay.Status.AddrInfo.ID == "" {
 			log.Info("relay is not ready yet. Will continue waiting.", "relay", relayName)
-			return ctrl.Result{RequeueAfter: time.Minute}, nil
+			return ctrl.Result{RequeueAfter: time.Second * 15}, nil
 		}
 	}
 	if err = r.Status().Update(ctx, instance); err != nil {
@@ -149,8 +149,15 @@ func (r *IpfsClusterReconciler) createTrackedObjects(
 	mutapisvc, _ := r.serviceAPI(instance, &apisvc)
 
 	mutCmScripts, cmScriptName := r.ConfigMapScripts(ctx, instance, &cmScripts)
-	mutSecConfig, secConfigName := r.SecretConfig(ctx, instance, &secConfig, []byte(clusterSecret), []byte(peerID.String()), []byte(privateString))
-	mutSts := r.statefulSet(instance, &sts, svcName, secConfigName, cmScriptName)
+	mutSecConfig, secConfigName := r.SecretConfig(
+		ctx,
+		instance,
+		&secConfig,
+		[]byte(clusterSecret),
+		[]byte(peerID.String()),
+		[]byte(privateString),
+	)
+	mutSts := r.StatefulSet(instance, &sts, svcName, secConfigName, cmScriptName)
 
 	trackedObjects := map[client.Object]controllerutil.MutateFn{
 		&sa:        mutsa,

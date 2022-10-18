@@ -1,3 +1,4 @@
+# set binary versions
 GOLANGCI_VERSION := v1.46.1
 HELM_VERSION := v3.8.2
 KUTTL_VERSION := 0.10.0
@@ -136,7 +137,7 @@ test: lint manifests generate fmt vet lint envtest ginkgo ## Run tests.
 
 .PHONY: test-e2e
 test-e2e: kuttl ## Run e2e tests. Requires cluster w/ Scribe already installed
-	cd test-kuttl && $(KUTTL) test --namespace test
+	cd test-kuttl && $(KUTTL) test 
 	rm -f test-kuttl/kubeconfig
 
 ##@ Build

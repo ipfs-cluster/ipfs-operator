@@ -1,6 +1,18 @@
 ---
-apiVersion: kuttl.dev/v1beta1
-kind: TestStep
-commands:
-  - timeout: 90
-    command: ./05-create-ipfs-cluster.sh
+apiVersion: cluster.ipfs.io/v1alpha1
+kind: IpfsCluster
+metadata:
+  name: ipfs-sample-1
+spec:
+  url: example.com
+  ipfsStorage: 2Gi
+  clusterStorage: 2Gi
+  public: false
+  replicas: 2
+  follows: []
+  ipfsResources:
+    limits:
+      cpu: 250m
+      memory: 512M
+  networking:
+    circuitRelays: 0

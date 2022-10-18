@@ -91,7 +91,7 @@ func (r *CircuitRelayReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	if len(rsvc.Status.LoadBalancer.Ingress) == 0 {
 		log.Info("still waiting for service ingress addresses", "name", instance.Name)
 		return ctrl.Result{
-			RequeueAfter: time.Minute,
+			RequeueAfter: time.Second * 15,
 		}, err
 	}
 
@@ -111,7 +111,7 @@ func (r *CircuitRelayReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		if err != nil {
 			log.Error(err, "error generating new identity")
 			return ctrl.Result{
-				RequeueAfter: time.Minute,
+				RequeueAfter: time.Second * 15,
 			}, err
 		}
 		sec := corev1.Secret{}

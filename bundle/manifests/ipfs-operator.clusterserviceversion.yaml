@@ -22,7 +22,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    operators.operatorframework.io/builder: operator-sdk-unknown
+    operators.operatorframework.io/builder: operator-sdk-v1.22.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
   name: ipfs-operator.v0.0.1
   namespace: placeholder
@@ -259,7 +259,7 @@ spec:
                 - --leader-elect
                 command:
                 - /manager
-                image: coryschwartz/ipfs-operator:v0.0.1
+                image: quay.io/redhat-et-ipfs/ipfs-operator:v0.0.1
                 imagePullPolicy: IfNotPresent
                 livenessProbe:
                   httpGet:

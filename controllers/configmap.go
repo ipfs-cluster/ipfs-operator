@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 
@@ -14,9 +15,7 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 	clusterv1alpha1 "github.com/redhat-et/ipfs-operator/api/v1alpha1"
 	"github.com/redhat-et/ipfs-operator/controllers/scripts"
-	"github.com/redhat-et/ipfs-operator/controllers/utils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -29,97 +28,90 @@ const (
 	ScriptIPFSClusterEntryPoint = "entrypoint.sh"
 )
 
-// ConfigMapScripts Returns a mutate function which loads the given configMap with scripts that
+// EnsureConfigMapScripts Returns a mutate function which loads the given configMap with scripts that
 // customize the startup of the IPFS containers depending on the values from the given IPFS cluster resource.
-func (r *IpfsClusterReconciler) ConfigMapScripts(
+func (r *IpfsClusterReconciler) EnsureConfigMapScripts(
 	ctx context.Context,
 	m *clusterv1alpha1.IpfsCluster,
-	cm *corev1.ConfigMap,
-) (controllerutil.MutateFn, string) {
+	relayPeers []peer.AddrInfo,
+	relayStatic []ma.Multiaddr,
+) (*corev1.ConfigMap, error) {
 	var err error
 	log := ctrllog.FromContext(ctx)
-
-	relayPeers, err := r.getCircuitInfo(ctx, m)
-	if err != nil {
-		log.Error(err, "could not get relay circuit info")
-		return utils.ErrFunc(fmt.Errorf("error when getting relay circuit info: %w", err)), ""
-	}
-	relayStatic, err := staticAddrsFromRelayPeers(relayPeers)
-	if err != nil {
-		log.Error(err, "could not get static addresses from relayPeers")
-		return utils.ErrFunc(fmt.Errorf("could not get static addresses: %w", err)), ""
-	}
-	// convert multiaddrs to strings
-	relayStaticStrs := make([]string, len(relayStatic))
-	for i, maddr := range relayStatic {
-		relayStaticStrs[i] = maddr.String()
-	}
-
-	relayConfig := config.RelayClient{
-		Enabled:      config.True,
-		StaticRelays: relayStaticStrs,
-	}
-
 	cmName := "ipfs-cluster-scripts-" + m.Name
-
-	// configure storage variables
-	if err != nil {
-		return utils.ErrFunc(err), ""
-	}
-
-	// compute storage sizes of IPFS volumes
-	sizei64, ok := m.Spec.IpfsStorage.AsInt64()
-	if !ok {
-		sizei64 = m.Spec.IpfsStorage.ToDec().Value()
-	}
-	maxStorage := MaxIPFSStorage(sizei64)
-	maxStorageS := fmt.Sprintf("%dB", maxStorage)
-	bloomFilterSize := scripts.CalculateBloomFilterSize(maxStorage)
-	if err != nil {
-		return func() error {
-			return err
-		}, ""
-	}
-
-	// reprovider settings
-	reproviderStrategy := m.Spec.Reprovider.Strategy
-	if reproviderStrategy == "" {
-		reproviderStrategy = clusterv1alpha1.ReproviderStrategyAll
-	}
-	reproviderInterval := m.Spec.Reprovider.Interval
-	if reproviderInterval == "" {
-		reproviderInterval = "12h"
-	}
-
-	// get the config script
-	configScript, err := scripts.CreateConfigureScript(
-		maxStorageS,
-		relayPeers,
-		relayConfig,
-		bloomFilterSize,
-		reproviderInterval,
-		string(reproviderStrategy),
-	)
-
-	expected := &corev1.ConfigMap{
+	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cmName,
 			Namespace: m.Namespace,
 		},
-		Data: map[string]string{
-			"entrypoint.sh":     scripts.IPFSClusterEntrypoint,
-			"configure-ipfs.sh": configScript,
-		},
 	}
-	expected.DeepCopyInto(cm)
-	if err = ctrl.SetControllerReference(m, cm, r.Scheme); err != nil {
-		return func() error {
-			return err
-		}, ""
+	err = r.Get(ctx, client.ObjectKeyFromObject(cm), cm)
+	if err != nil && !errors.IsNotFound(err) {
+		return nil, fmt.Errorf("could not get configmap: %w", err)
 	}
-	return func() error {
+
+	op, err := ctrl.CreateOrUpdate(ctx, r.Client, cm, func() error {
+		// TODO: compute these values in another function & place them here
+		// convert multiaddrs to strings
+		relayStaticStrs := make([]string, len(relayStatic))
+		for i, maddr := range relayStatic {
+			relayStaticStrs[i] = maddr.String()
+		}
+
+		relayConfig := config.RelayClient{
+			Enabled:      config.True,
+			StaticRelays: relayStaticStrs,
+		}
+
+		// compute storage sizes of IPFS volumes
+		sizei64, ok := m.Spec.IpfsStorage.AsInt64()
+		if !ok {
+			sizei64 = m.Spec.IpfsStorage.ToDec().Value()
+		}
+		maxStorage := MaxIPFSStorage(sizei64)
+		maxStorageS := fmt.Sprintf("%dB", maxStorage)
+		bloomFilterSize := scripts.CalculateBloomFilterSize(maxStorage)
+
+		// reprovider settings
+		reproviderStrategy := m.Spec.Reprovider.Strategy
+		if reproviderStrategy == "" {
+			reproviderStrategy = clusterv1alpha1.ReproviderStrategyAll
+		}
+		reproviderInterval := m.Spec.Reprovider.Interval
+		if reproviderInterval == "" {
+			reproviderInterval = "12h"
+		}
+
+		// get the config script
+		isPrivateNetwork := m.Spec.Networking.NetworkMode == clusterv1alpha1.NetworkModePrivate
+		configScript, internalErr := scripts.CreateConfigureScript(
+			maxStorageS,
+			relayPeers,
+			relayConfig,
+			bloomFilterSize,
+			reproviderInterval,
+			string(reproviderStrategy),
+			isPrivateNetwork,
+		)
+		if internalErr != nil {
+			return fmt.Errorf("could not create config script: %w", internalErr)
+		}
+
+		cm.Data = map[string]string{
+			ScriptIPFSClusterEntryPoint: scripts.IPFSClusterEntrypoint,
+			ScriptConfigureIPFS:         configScript,
+		}
+		if internalErr = ctrl.SetControllerReference(m, cm, r.Scheme); internalErr != nil {
+			return fmt.Errorf("failed to set controller reference: %w", internalErr)
+		}
 		return nil
-	}, cmName
+	})
+	if err != nil {
+		log.Error(err, "failed to createorupdate configmap", "operation", op, "configmap", cm)
+		return nil, fmt.Errorf("could not create or update configmap: %w", err)
+	}
+	log.Info("completed createorupdate configmap", "operation", op, "configMap", cm)
+	return cm, nil
 }
 
 // staticAddrsFromRelayPeers Extracts all of the static addresses from the

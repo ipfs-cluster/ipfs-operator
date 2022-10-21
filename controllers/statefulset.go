@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"context"
 	"regexp"
 	"strings"
 
@@ -9,7 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
 	clusterv1alpha1 "github.com/redhat-et/ipfs-operator/api/v1alpha1"
 	"github.com/redhat-et/ipfs-operator/controllers/utils"
@@ -62,15 +63,22 @@ const (
 // FIXME: break this function up to use createOrUpdate and set values in the struct line-by-line
 //
 // nolint:funlen // Function is long due to Kube resource definitions
-func (r *IpfsClusterReconciler) StatefulSet(m *clusterv1alpha1.IpfsCluster,
-	sts *appsv1.StatefulSet,
+func (r *IpfsClusterReconciler) StatefulSet(
+	ctx context.Context,
+	m *clusterv1alpha1.IpfsCluster,
 	serviceName string,
 	secretName string,
 	configMapBootstrapScriptName string,
-) controllerutil.MutateFn {
+) (sts *appsv1.StatefulSet, err error) {
+	log := ctrllog.FromContext(ctx)
 	ssName := "ipfs-cluster-" + m.Name
+	sts = &appsv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      ssName,
+			Namespace: m.Namespace,
+		},
+	}
 
-	//
 	var ipfsResources corev1.ResourceRequirements
 	if m.Spec.IPFSResources != nil {
 		ipfsResources = *m.Spec.IPFSResources
@@ -78,12 +86,8 @@ func (r *IpfsClusterReconciler) StatefulSet(m *clusterv1alpha1.IpfsCluster,
 		ipfsResources = utils.IPFSContainerResources(m.Spec.IpfsStorage.Value())
 	}
 
-	expected := &appsv1.StatefulSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      ssName,
-			Namespace: m.Namespace,
-		},
-		Spec: appsv1.StatefulSetSpec{
+	op, err := ctrl.CreateOrUpdate(ctx, r.Client, sts, func() error {
+		sts.Spec = appsv1.StatefulSetSpec{
 			Replicas: &m.Spec.Replicas,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
@@ -327,21 +331,23 @@ func (r *IpfsClusterReconciler) StatefulSet(m *clusterv1alpha1.IpfsCluster,
 				},
 			},
 			ServiceName: serviceName,
-		},
-	}
+		}
 
-	// Add a follower container for each follow.
-	follows := followContainers(m)
-	expected.Spec.Template.Spec.Containers = append(expected.Spec.Template.Spec.Containers, follows...)
-	expected.DeepCopyInto(sts)
-	// FIXME: catch this error before returning a function that just errors
-	if err := ctrl.SetControllerReference(m, sts, r.Scheme); err != nil {
-		return func() error { return err }
-	}
-	return func() error {
-		sts.Spec = expected.Spec
+		// Add a follower container for each follow.
+		follows := followContainers(m)
+		sts.Spec.Template.Spec.Containers = append(sts.Spec.Template.Spec.Containers, follows...)
+		if innerErr := ctrl.SetControllerReference(m, sts, r.Scheme); innerErr != nil {
+			return innerErr
+		}
 		return nil
+	})
+	if err != nil {
+		log.Error(err, "failed to createorupdate statefulset", "operation", op, "statefulset", sts)
+		return nil, err
 	}
+	log.Info("completed createorupdate statefulset", "operation", op)
+	// FIXME: catch this error before returning a function that just errors
+	return sts, nil
 }
 
 // followContainers Returns a list of container objects which follow the given followParams.

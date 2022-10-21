@@ -5,6 +5,8 @@ import (
 	"encoding/base64"
 	"math/rand"
 
+	"github.com/libp2p/go-libp2p/core/peer"
+	ma "github.com/multiformats/go-multiaddr"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
@@ -19,9 +21,13 @@ import (
 var _ = Describe("IPFS Reconciler", func() {
 	var ipfsReconciler *controllers.IpfsClusterReconciler
 	var ipfs *v1alpha1.IpfsCluster
-	var configMapScripts *v1.ConfigMap
+	var ns *v1.Namespace
 	var ctx context.Context
-	const myName = "my-fav-ipfs-node"
+
+	const (
+		myName = "my-fav-ipfs-node"
+		nsName = "test"
+	)
 
 	BeforeEach(func() {
 		ctx = context.TODO()
@@ -29,22 +35,31 @@ var _ = Describe("IPFS Reconciler", func() {
 			Scheme: k8sClient.Scheme(),
 			Client: k8sClient,
 		}
-		configMapScripts = &v1.ConfigMap{}
+		ns = &v1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: nsName,
+			},
+		}
+		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
 		ipfs = &v1alpha1.IpfsCluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      myName,
-				Namespace: "test",
+				Namespace: ns.ObjectMeta.Name,
 			},
 		}
+		Expect(k8sClient.Create(ctx, ipfs)).To(Succeed())
+	})
+
+	AfterEach(func() {
+		Expect(k8sClient.Delete(ctx, ns)).To(Succeed())
 	})
 
 	When("ConfigMapScripts are edited", func() {
 		It("populates the ConfigMap", func() {
 			// configMap is empty
-			Expect(len(configMapScripts.Data)).To(Equal(0))
-			fn, _ := ipfsReconciler.ConfigMapScripts(ctx, ipfs, configMapScripts)
+			configMapScripts, err := ipfsReconciler.EnsureConfigMapScripts(ctx, ipfs, []peer.AddrInfo{}, []ma.Multiaddr{})
 			// should not have errored
-			Expect(fn()).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 			// the configmap should be populated with the following scripts
 			Expect(len(configMapScripts.Data)).To(Equal(2))
 
@@ -60,11 +75,11 @@ var _ = Describe("IPFS Reconciler", func() {
 		})
 
 		It("contains the IPFS resource name", func() {
-			fn, name := ipfsReconciler.ConfigMapScripts(ctx, ipfs, configMapScripts)
-			Expect(fn).NotTo(BeNil())
-			Expect(fn()).NotTo(HaveOccurred())
-			Expect(name).To(ContainSubstring(myName))
-			Expect(name).To(Equal("ipfs-cluster-scripts-" + myName))
+			configMap, err := ipfsReconciler.EnsureConfigMapScripts(ctx, ipfs, []peer.AddrInfo{}, []ma.Multiaddr{})
+			Expect(configMap).NotTo(BeNil())
+			Expect(err).NotTo(HaveOccurred())
+			Expect(configMap.Name).To(ContainSubstring(myName))
+			Expect(configMap.Name).To(Equal("ipfs-cluster-scripts-" + myName))
 		})
 	})
 
@@ -81,20 +96,18 @@ var _ = Describe("IPFS Reconciler", func() {
 			ipfs.Spec.Replicas = replicas
 		})
 		It("creates a new peer ids", func() {
-			secretConfig := &v1.Secret{}
-			fn, _ := ipfsReconciler.SecretConfig(ctx, ipfs, secretConfig)
-			Expect(fn()).To(BeNil())
+			secretConfig, err := ipfsReconciler.EnsureSecretConfig(ctx, ipfs)
+			Expect(err).To(BeNil())
 			secretStringToData(secretConfig)
 			expectedKeys := int(replicas)*2 + alwaysKeys
 			Expect(len(secretConfig.Data)).To(Equal(expectedKeys))
 
 			// increase the replica count. Expect to see new keys generated.
 			ipfs.Spec.Replicas++
-			fn, _ = ipfsReconciler.SecretConfig(ctx, ipfs, secretConfig)
-			Expect(fn()).To(BeNil())
+			secretConfig, err = ipfsReconciler.EnsureSecretConfig(ctx, ipfs)
+			Expect(err).To(BeNil())
 			secretStringToData(secretConfig)
 			Expect(len(secretConfig.Data)).To(Equal(expectedKeys + 2))
-
 		})
 	})
 })
@@ -103,10 +116,11 @@ var _ = Describe("StatefulSet creation", func() {
 	var ipfsReconciler *controllers.IpfsClusterReconciler
 	var ipfs *v1alpha1.IpfsCluster
 	var sts *appsv1.StatefulSet
+	var ns *v1.Namespace
 	// var configMapScripts *v1.ConfigMap
 	// var secret *v1.Secret
 	// var svc *v1.Service
-	// var ctx context.Context
+	var ctx context.Context
 
 	const (
 		myName      = "my-fav-ipfs-node"
@@ -116,48 +130,64 @@ var _ = Describe("StatefulSet creation", func() {
 		namespace   = "test"
 	)
 	BeforeEach(func() {
-		// ctx = context.TODO()
+		ctx = context.TODO()
 		ipfsReconciler = &controllers.IpfsClusterReconciler{
 			Scheme: k8sClient.Scheme(),
 			Client: k8sClient,
 		}
-		// configMapScripts = &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
-		// 	Name: scriptsName,
-		// }}
+		ns = &v1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: namespace,
+			},
+		}
+		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
 		ipfs = &v1alpha1.IpfsCluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      myName,
-				Namespace: namespace,
+				Namespace: ns.Name,
 			},
 		}
-		sts = &appsv1.StatefulSet{}
+		Expect(k8sClient.Create(ctx, ipfs))
 		// secret = &v1.Secret{ObjectMeta: metav1.ObjectMeta{Name: secretName}}
 		// svc = &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: svcName}}
 	})
+	AfterEach(func() {
+		Expect(k8sClient.Delete(ctx, ns)).To(Succeed())
+	})
 
 	When("ipfsResources is specified", func() {
-		var cpuLimit = resource.NewQuantity(58, "m")
-		var memoryLimit = resource.NewQuantity(10000, "m")
-		var cpu = resource.NewQuantity(20, "m")
-		var memory = resource.NewQuantity(40, "M")
+		var cpuLimit resource.Quantity
+		var memoryLimit resource.Quantity
+		var cpu resource.Quantity
+		var memory resource.Quantity
 		BeforeEach(func() {
+			var err error
+			cpuLimit, err = resource.ParseQuantity("58m")
+			Expect(err).NotTo(HaveOccurred())
+			memoryLimit, err = resource.ParseQuantity("10Mi")
+			Expect(err).NotTo(HaveOccurred())
+			cpu, err = resource.ParseQuantity("20m")
+			Expect(err).NotTo(HaveOccurred())
+			memory, err = resource.ParseQuantity("40M")
+			Expect(err).NotTo(HaveOccurred())
 			ipfs.Spec.IPFSResources = &v1.ResourceRequirements{
 				Limits: v1.ResourceList{
-					v1.ResourceLimitsCPU:    *cpuLimit,
-					v1.ResourceLimitsMemory: *memoryLimit,
+					v1.ResourceLimitsCPU:    cpuLimit,
+					v1.ResourceLimitsMemory: memoryLimit,
 				},
 				Requests: v1.ResourceList{
-					v1.ResourceCPU:    *cpu,
-					v1.ResourceMemory: *memory,
+					v1.ResourceCPU:    cpu,
+					v1.ResourceMemory: memory,
 				},
 			}
 			ipfs.Spec.ClusterStorage = *resource.NewQuantity(1, "Gi")
 			ipfs.Spec.IpfsStorage = *resource.NewQuantity(1, "Gi")
 		})
 		It("uses the IPFSCluster's IPFSResources setting", func() {
-			mutFn := ipfsReconciler.StatefulSet(ipfs, sts, svcName, secretName, scriptsName)
-			err := mutFn()
+			var err error
+			sts, err = ipfsReconciler.StatefulSet(ctx, ipfs, svcName, secretName, scriptsName)
 			Expect(err).NotTo(HaveOccurred())
+			Expect(sts).NotTo(BeNil())
 
 			// find IPFS Container
 			var ipfsContainer v1.Container
@@ -170,11 +200,11 @@ var _ = Describe("StatefulSet creation", func() {
 			Expect(ipfsContainer).NotTo(BeNil())
 			ipfsResources := ipfsContainer.Resources
 			Expect(ipfsResources.Limits).NotTo(BeEmpty())
-			Expect(ipfsResources.Limits[v1.ResourceLimitsCPU]).To(Equal(*cpuLimit))
-			Expect(ipfsResources.Limits[v1.ResourceLimitsMemory]).To(Equal(*memoryLimit))
+			Expect(ipfsResources.Limits[v1.ResourceLimitsCPU]).To(Equal(cpuLimit))
+			Expect(ipfsResources.Limits[v1.ResourceLimitsMemory]).To(Equal(memoryLimit))
 			Expect(ipfsResources.Requests).NotTo(BeEmpty())
-			Expect(ipfsResources.Requests[v1.ResourceCPU]).To(Equal(*cpu))
-			Expect(ipfsResources.Requests[v1.ResourceMemory]).To(Equal(*memory))
+			Expect(ipfsResources.Requests[v1.ResourceCPU]).To(Equal(cpu))
+			Expect(ipfsResources.Requests[v1.ResourceMemory]).To(Equal(memory))
 		})
 	})
 
@@ -184,9 +214,10 @@ var _ = Describe("StatefulSet creation", func() {
 			ipfs.Spec.IpfsStorage = *resource.NewQuantity(16, "T")
 		})
 		It("automatically computes resources requirements", func() {
-			mutFn := ipfsReconciler.StatefulSet(ipfs, sts, svcName, secretName, scriptsName)
-			err := mutFn()
+			var err error
+			sts, err = ipfsReconciler.StatefulSet(ctx, ipfs, svcName, secretName, scriptsName)
 			Expect(err).NotTo(HaveOccurred())
+			Expect(sts).NotTo(BeNil())
 
 			// find IPFS Container
 			var ipfsContainer v1.Container

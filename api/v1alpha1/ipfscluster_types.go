@@ -92,7 +92,8 @@ type IpfsClusterSpec struct {
 	// networking defines network configuration settings.
 	Networking NetworkConfig `json:"networking"`
 	// follows defines the list of other IPFS Clusters this one should follow.
-	Follows []followParams `json:"follows"`
+	// +optional
+	Follows []*followParams `json:"follows,omitempty"`
 	// ipfsResources specifies the resource requirements for each IPFS container. If this
 	// value is omitted, then the operator will automatically determine these settings
 	// based on the storage sizes used.

@@ -184,8 +184,14 @@ func (in *IpfsClusterSpec) DeepCopyInto(out *IpfsClusterSpec) {
 	out.Networking = in.Networking
 	if in.Follows != nil {
 		in, out := &in.Follows, &out.Follows
-		*out = make([]followParams, len(*in))
-		copy(*out, *in)
+		*out = make([]*followParams, len(*in))
+		for i := range *in {
+			if (*in)[i] != nil {
+				in, out := &(*in)[i], &(*out)[i]
+				*out = new(followParams)
+				**out = **in
+			}
+		}
 	}
 	if in.IPFSResources != nil {
 		in, out := &in.IPFSResources, &out.IPFSResources

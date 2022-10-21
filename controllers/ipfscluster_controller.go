@@ -32,8 +32,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
+	"github.com/libp2p/go-libp2p/core/peer"
+	ma "github.com/multiformats/go-multiaddr"
 	clusterv1alpha1 "github.com/redhat-et/ipfs-operator/api/v1alpha1"
-	"github.com/redhat-et/ipfs-operator/controllers/utils"
 )
 
 const (
@@ -60,10 +61,11 @@ type IpfsClusterReconciler struct {
 
 func (r *IpfsClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
+	failResult := ctrl.Result{RequeueAfter: time.Second * 15}
 	// Fetch the Ipfs instance
 	instance, err := r.ensureIPFSCluster(ctx, req)
 	if err != nil {
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("failed to ensure ipfscluster: %w", err)
 	}
 
 	// Add finalizer for this CR
@@ -71,7 +73,7 @@ func (r *IpfsClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		controllerutil.AddFinalizer(instance, finalizer)
 		err = r.Update(ctx, instance)
 		if err != nil {
-			return ctrl.Result{}, err
+			return ctrl.Result{}, fmt.Errorf("failed to update instance: %w", err)
 		}
 		return ctrl.Result{Requeue: true}, nil
 	}
@@ -82,8 +84,7 @@ func (r *IpfsClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	if err = r.createCircuitRelays(ctx, instance); err != nil {
-		log.Error(err, "cannot create circuit relays")
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("cannot create circuit relays: %w", err)
 	}
 
 	// Check the status of circuit relays.
@@ -93,12 +94,11 @@ func (r *IpfsClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		relay.Name = relayName
 		relay.Namespace = instance.Namespace
 		if err = r.Client.Get(ctx, client.ObjectKeyFromObject(&relay), &relay); err != nil {
-			log.Error(err, "could not lookup circuitRelay", "relay", relayName)
-			return ctrl.Result{Requeue: true}, err
+			return ctrl.Result{Requeue: true}, fmt.Errorf("could not lookup circuitRelay %q: %w", relayName, err)
 		}
 		if relay.Status.AddrInfo.ID == "" {
 			log.Info("relay is not ready yet. Will continue waiting.", "relay", relayName)
-			return ctrl.Result{RequeueAfter: time.Second * 15}, nil
+			return failResult, nil
 		}
 	}
 	if err = r.Status().Update(ctx, instance); err != nil {
@@ -106,47 +106,45 @@ func (r *IpfsClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	// Reconcile the tracked objects
-	trackedObjects := r.createTrackedObjects(ctx, instance)
-	shouldRequeue := utils.CreateOrPatchTrackedObjects(ctx, trackedObjects, r.Client, log)
-	return ctrl.Result{Requeue: shouldRequeue}, nil
+	err = r.createTrackedObjects(ctx, instance)
+	if err != nil {
+		log.Error(err, "failed to reconcile ipfscluster")
+		return failResult, err
+	}
+	return ctrl.Result{Requeue: false}, nil
 }
 
 // createTrackedObjects Creates a mapping from client objects to their mutating functions.
 func (r *IpfsClusterReconciler) createTrackedObjects(
 	ctx context.Context,
 	instance *clusterv1alpha1.IpfsCluster,
-	// peerID peer.ID,
-	// clusterSecret string,
-	// privateString string,
-) map[client.Object]controllerutil.MutateFn {
-	sa := corev1.ServiceAccount{}
-	svc := corev1.Service{}
-	cmScripts := corev1.ConfigMap{}
-	secConfig := corev1.Secret{}
-	sts := appsv1.StatefulSet{}
+) error {
+	var err error
+	var svc *corev1.Service
+	var secret *corev1.Secret
+	var cmScripts *corev1.ConfigMap
+	var relayPeers []peer.AddrInfo
+	var relayStatic []ma.Multiaddr
 
-	mutsa := r.serviceAccount(instance, &sa)
-	mutsvc, svcName := r.serviceCluster(instance, &svc)
-
-	mutCmScripts, cmScriptName := r.ConfigMapScripts(ctx, instance, &cmScripts)
-	mutSecConfig, secConfigName := r.SecretConfig(
-		ctx,
-		instance,
-		&secConfig,
-		// []byte(clusterSecret),
-		// []byte(privateString),
-		// peerID.String(),
-	)
-	mutSts := r.StatefulSet(instance, &sts, svcName, secConfigName, cmScriptName)
-
-	trackedObjects := map[client.Object]controllerutil.MutateFn{
-		&sa:        mutsa,
-		&svc:       mutsvc,
-		&cmScripts: mutCmScripts,
-		&secConfig: mutSecConfig,
-		&sts:       mutSts,
+	if _, err = r.ensureSA(ctx, instance); err != nil {
+		return fmt.Errorf("retrieved error while ensuring SA: %w", err)
 	}
-	return trackedObjects
+	if svc, err = r.ensureServiceCluster(ctx, instance); err != nil {
+		return fmt.Errorf("could not ensure service cluster: %w", err)
+	}
+	if secret, err = r.EnsureSecretConfig(ctx, instance); err != nil {
+		return fmt.Errorf("failed to ensure secret config: %w", err)
+	}
+	if relayPeers, relayStatic, err = r.EnsureRelayCircuitInfo(ctx, instance); err != nil {
+		return fmt.Errorf("could not retrieve information from the relay circuit: %w", err)
+	}
+	if cmScripts, err = r.EnsureConfigMapScripts(ctx, instance, relayPeers, relayStatic); err != nil {
+		return fmt.Errorf("could not ensure configmap scripts: %w", err)
+	}
+	if _, err = r.StatefulSet(ctx, instance, svc.Name, secret.ObjectMeta.Name, cmScripts.ObjectMeta.Name); err != nil {
+		return fmt.Errorf("could not ensure statefulset: %w", err)
+	}
+	return nil
 }
 
 // ensureIPFSCluster Attempts to obtain an IPFS Cluster resource, and error if not found.

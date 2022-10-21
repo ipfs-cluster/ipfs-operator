@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"log"
 	"math"
 	"strconv"
 	"text/template"
@@ -151,17 +152,23 @@ func CreateConfigureScript(
 	bloomFilterSize int64,
 	reproviderInterval string,
 	reproviderStrategy string,
+	isPrivateNetwork bool,
 ) (string, error) {
 	// set settings
 	configureTmpl, _ := template.New("configureIpfs").Parse(configureIpfs)
-	config, err := createTemplateConfig(storageMax, peers, relayConfig)
+	config, err := createTemplateConfig(storageMax, peers, relayConfig, bloomFilterSize, reproviderInterval,
+		reproviderStrategy, isPrivateNetwork)
 	if err != nil {
 		return "", err
 	}
-	config.Swarm.RelayClient = relayConfig
-	config.Datastore.BloomFilterSize = int(bloomFilterSize)
-	config.Reprovider.Interval = reproviderInterval
-	config.Reprovider.Strategy = reproviderStrategy
+	// config.Swarm.RelayClient = relayConfig
+	// config.Datastore.BloomFilterSize = int(bloomFilterSize)
+	// config.Reprovider.Interval = reproviderInterval
+	// config.Reprovider.Strategy = reproviderStrategy
+
+	if isPrivateNetwork {
+		config.Bootstrap = []string{}
+	}
 
 	// convert config settings into json string
 	configBytes, err := json.Marshal(config)
@@ -256,6 +263,10 @@ func createTemplateConfig(
 	storageMax string,
 	peers []peer.AddrInfo,
 	rc config.RelayClient,
+	bloomFilterSize int64,
+	reproviderInterval string,
+	reproviderStrategy string,
+	isPrivateNetwork bool,
 ) (conf config.Config, err error) {
 	// attempt to generate an identity
 
@@ -271,6 +282,15 @@ func createTemplateConfig(
 		return
 	}
 	applyIPFSClusterK8sDefaults(&conf, storageMax, peers, rc)
+
+	conf.Swarm.RelayClient = rc
+	conf.Datastore.BloomFilterSize = int(bloomFilterSize)
+	conf.Reprovider.Interval = reproviderInterval
+	conf.Reprovider.Strategy = reproviderStrategy
+
+	// handle bootstrap peers
+	log.Printf("using private network: %t\n", isPrivateNetwork)
+
 	return
 }
 

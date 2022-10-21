@@ -61,12 +61,16 @@ func (r *IpfsClusterReconciler) serviceGateway(
 	svc *corev1.Service,
 ) (controllerutil.MutateFn, string) {
 	svcName := "ipfs-cluster-gateway-" + m.Name
+	annotations := map[string]string{}
+	for k, v := range m.Spec.Gateway.AppendAnnotations {
+		annotations[k] = v
+	}
 	expected := expectedService(
 		svcName,
 		m.Name,
 		m.Namespace,
 		"LoadBalancer",
-		m.Annotations,
+		annotations,
 		[]corev1.ServicePort{
 			{
 				Name:       nameIpfsHTTP,
@@ -93,12 +97,16 @@ func (r *IpfsClusterReconciler) serviceAPI(
 	svc *corev1.Service,
 ) (controllerutil.MutateFn, string) {
 	svcName := "ipfs-cluster-api-" + m.Name
+	annotations := map[string]string{}
+	for k, v := range m.Spec.ClusterAPI.AppendAnnotations {
+		annotations[k] = v
+	}
 	expected := expectedService(
 		svcName,
 		m.Name,
 		m.Namespace,
 		"LoadBalancer",
-		m.Annotations,
+		annotations,
 		[]corev1.ServicePort{
 			{
 				Name:       nameClusterAPI,

@@ -44,9 +44,9 @@ const (
 	ReproviderStrategyPinned ReproviderStrategy = "pinned"
 	// ReproviderStrategyRoots Only announces the root block of explicitly pinned CIDs.
 	ReproviderStrategyRoots      ReproviderStrategy = "roots"
-	ExternalStrategyNone         ExternalStrategy   = "none"
-	ExternalStrategyIngress      ExternalStrategy   = "ingress"
-	ExternalStrategyLoadBalancer ExternalStrategy   = "loadbalancer"
+	ExternalStrategyNone         ExternalStrategy   = "None"
+	ExternalStrategyIngress      ExternalStrategy   = "Ingress"
+	ExternalStrategyLoadBalancer ExternalStrategy   = "LoadBalancer"
 )
 
 type ReprovideSettings struct {
@@ -65,7 +65,7 @@ type ExternalSettings struct {
 	// +optional
 	Strategy ExternalStrategy `json:"strategy,omitempty"`
 	// +optional
-	Annotations map[string]string `json:"interval,omitempty"`
+	AppendAnnotations map[string]string `json:"appendAnnotations,omitempty"`
 }
 
 type followParams struct {

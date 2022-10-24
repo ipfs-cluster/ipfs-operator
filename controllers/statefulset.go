@@ -92,6 +92,28 @@ func (r *IpfsClusterReconciler) StatefulSet(
 	}
 
 	op, err := ctrl.CreateOrUpdate(ctx, r.Client, sts, func() error {
+		// configure envs
+		configureIPFSEnvs := []corev1.EnvVar{}
+		ipfsEnvs := []corev1.EnvVar{{
+			Name:  "IPFS_FD_MAX",
+			Value: "4096",
+		}}
+		if m.Spec.Networking.NetworkMode == clusterv1alpha1.NetworkModePrivate {
+			swarmKeySecret := corev1.EnvVar{
+				Name: EnvIPFSSwarmKey,
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: secretName,
+						},
+						Key: KeySwarmKey,
+					},
+				},
+			}
+			configureIPFSEnvs = append(configureIPFSEnvs, swarmKeySecret)
+			ipfsEnvs = append(ipfsEnvs, swarmKeySecret)
+		}
+
 		sts.Spec = appsv1.StatefulSetSpec{
 			Replicas: &m.Spec.Replicas,
 			Selector: &metav1.LabelSelector{
@@ -129,19 +151,7 @@ func (r *IpfsClusterReconciler) StatefulSet(
 									MountPath: "/node-data",
 								},
 							},
-							Env: []corev1.EnvVar{
-								{
-									Name: EnvIPFSSwarmKey,
-									ValueFrom: &corev1.EnvVarSource{
-										SecretKeyRef: &corev1.SecretKeySelector{
-											LocalObjectReference: corev1.LocalObjectReference{
-												Name: secretName,
-											},
-											Key: KeySwarmKey,
-										},
-									},
-								},
-							},
+							Env: configureIPFSEnvs,
 						},
 					},
 					Containers: []corev1.Container{
@@ -149,23 +159,7 @@ func (r *IpfsClusterReconciler) StatefulSet(
 							Name:            ContainerIPFS,
 							Image:           ipfsImage,
 							ImagePullPolicy: corev1.PullIfNotPresent,
-							Env: []corev1.EnvVar{
-								{
-									Name:  "IPFS_FD_MAX",
-									Value: "4096",
-								},
-								{
-									Name: EnvIPFSSwarmKey,
-									ValueFrom: &corev1.EnvVarSource{
-										SecretKeyRef: &corev1.SecretKeySelector{
-											LocalObjectReference: corev1.LocalObjectReference{
-												Name: secretName,
-											},
-											Key: KeySwarmKey,
-										},
-									},
-								},
-							},
+							Env:             ipfsEnvs,
 							Ports: []corev1.ContainerPort{
 								{
 									Name:          "swarm",

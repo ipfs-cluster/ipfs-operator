@@ -18,8 +18,12 @@ import (
 )
 
 const (
-	peerIDPrefix     = "peerID-"
-	privateKeyPrefix = "privateKey-"
+	KeyClusterSecret           = "CLUSTER_SECRET"
+	KeyBootstrapPeerPrivateKey = "BOOTSTRAP_PEER_PRIV_KEY"
+	KeyBootstrapPeerID         = "BOOTSTRAP_PEER_ID"
+	KeySwarmKey                = "SWARM_KEY"
+	KeyPeerIDPrefix            = "peerID-"
+	KeyPrivateKeyPrefix        = "privateKey-"
 )
 
 func (r *IpfsClusterReconciler) EnsureSecretConfig(
@@ -83,6 +87,7 @@ func (r *IpfsClusterReconciler) createNewSecret(ctx context.Context, m *clusterv
 	// initialize new secret
 	secret.Data = make(map[string][]byte, 0)
 	var clusterSecret, bootstrapPrivateKey string
+	var swarmKey string
 	var peerID peer.ID
 
 	// save data in secret
@@ -92,14 +97,18 @@ func (r *IpfsClusterReconciler) createNewSecret(ctx context.Context, m *clusterv
 	if peerID, bootstrapPrivateKey, err = utils.GenerateIdentity(); err != nil {
 		return fmt.Errorf("could not create new ipfs identity: %w", err)
 	}
-
 	err = generateNewIdentities(secret, 0, m.Spec.Replicas)
 	if err != nil {
 		return fmt.Errorf("could not place new identities in secret: %w", err)
 	}
-	secret.Data["CLUSTER_SECRET"] = []byte(clusterSecret)
-	secret.Data["BOOTSTRAP_PEER_PRIV_KEY"] = []byte(bootstrapPrivateKey)
-	secret.StringData["BOOTSTRAP_PEER_ID"] = peerID.String()
+	if swarmKey, err = utils.NewSwarmKey(); err != nil {
+		return fmt.Errorf("could not create swarm key: %w", err)
+	}
+
+	secret.Data[KeyClusterSecret] = []byte(clusterSecret)
+	secret.Data[KeyBootstrapPeerPrivateKey] = []byte(bootstrapPrivateKey)
+	secret.StringData[KeySwarmKey] = swarmKey
+	secret.StringData[KeyBootstrapPeerID] = peerID.String()
 
 	// ensure reference is set
 	if err = ctrl.SetControllerReference(m, secret, r.Scheme); err != nil {
@@ -113,7 +122,7 @@ func (r *IpfsClusterReconciler) createNewSecret(ctx context.Context, m *clusterv
 func countIdentities(secret *corev1.Secret) int32 {
 	var count int32
 	for key := range secret.Data {
-		if strings.Contains(key, peerIDPrefix) {
+		if strings.Contains(key, KeyPeerIDPrefix) {
 			count++
 		}
 	}
@@ -132,9 +141,9 @@ func generateNewIdentities(secret *corev1.Secret, start, n int32) error {
 		if err != nil {
 			return err
 		}
-		peerIDKey := peerIDPrefix + strconv.Itoa(int(i))
+		peerIDKey := KeyPeerIDPrefix + strconv.Itoa(int(i))
 		secret.StringData[peerIDKey] = peerID.String()
-		secretKey := privateKeyPrefix + strconv.Itoa(int(i))
+		secretKey := KeyPrivateKeyPrefix + strconv.Itoa(int(i))
 		secret.StringData[secretKey] = privKey
 	}
 	return nil

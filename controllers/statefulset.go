@@ -58,6 +58,11 @@ const (
 	ipfsImage = "docker.io/ipfs/kubo:v0.16.0"
 )
 
+const (
+	EnvIPFSSwarmKey    = "IPFS_SWARM_KEY"
+	EnvLibP2PForcePnet = "LIBP2P_FORCE_PNET"
+)
+
 // StatefulSet Returns a mutate function that creates a StatefulSet for the
 // given IPFS cluster.
 // FIXME: break this function up to use createOrUpdate and set values in the struct line-by-line
@@ -124,6 +129,19 @@ func (r *IpfsClusterReconciler) StatefulSet(
 									MountPath: "/node-data",
 								},
 							},
+							Env: []corev1.EnvVar{
+								{
+									Name: EnvIPFSSwarmKey,
+									ValueFrom: &corev1.EnvVarSource{
+										SecretKeyRef: &corev1.SecretKeySelector{
+											LocalObjectReference: corev1.LocalObjectReference{
+												Name: secretName,
+											},
+											Key: KeySwarmKey,
+										},
+									},
+								},
+							},
 						},
 					},
 					Containers: []corev1.Container{
@@ -135,6 +153,17 @@ func (r *IpfsClusterReconciler) StatefulSet(
 								{
 									Name:  "IPFS_FD_MAX",
 									Value: "4096",
+								},
+								{
+									Name: EnvIPFSSwarmKey,
+									ValueFrom: &corev1.EnvVarSource{
+										SecretKeyRef: &corev1.SecretKeySelector{
+											LocalObjectReference: corev1.LocalObjectReference{
+												Name: secretName,
+											},
+											Key: KeySwarmKey,
+										},
+									},
 								},
 							},
 							Ports: []corev1.ContainerPort{

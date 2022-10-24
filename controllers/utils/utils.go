@@ -88,15 +88,35 @@ func IPFSContainerResources(ipfsStorageBytes int64) (ipfsResources corev1.Resour
 	return
 }
 
+// randomKey Returns a cryptographically-secure generated key.
+func randomKey(len int) (buf []byte, err error) {
+	buf = make([]byte, len)
+	if _, err = rand.Read(buf); err != nil {
+		return nil, err
+	}
+	return buf, nil
+}
+
 // NewClusterSecret Returns a new IPFS Cluster secret.
 func NewClusterSecret() (string, error) {
-	const secretLen = 32
-	buf := make([]byte, secretLen)
-	_, err := rand.Read(buf)
+	buf, err := randomKey(32)
 	if err != nil {
 		return "", err
 	}
 	return hex.EncodeToString(buf), nil
+}
+
+// NewSwarmKey Generates and returns a key used for hosting a private swarm.
+func NewSwarmKey() (string, error) {
+	const swarmPrefix = "/key/swarm/psk/1.0.0"
+	const multiBase = "/base16/"
+	buf, err := randomKey(32)
+	if err != nil {
+		return "", err
+	}
+	key := hex.EncodeToString(buf)
+	swarmKey := fmt.Sprintf("%s\n%s\n%s", swarmPrefix, multiBase, key)
+	return swarmKey, nil
 }
 
 // NewKey Generates a new private key and returns that along with the identity.

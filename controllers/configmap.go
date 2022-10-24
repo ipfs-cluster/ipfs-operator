@@ -35,6 +35,7 @@ func (r *IpfsClusterReconciler) EnsureConfigMapScripts(
 	m *clusterv1alpha1.IpfsCluster,
 	relayPeers []peer.AddrInfo,
 	relayStatic []ma.Multiaddr,
+	bootstrapPeers []string,
 ) (*corev1.ConfigMap, error) {
 	var err error
 	log := ctrllog.FromContext(ctx)
@@ -83,7 +84,6 @@ func (r *IpfsClusterReconciler) EnsureConfigMapScripts(
 		}
 
 		// get the config script
-		isPrivateNetwork := m.Spec.Networking.NetworkMode == clusterv1alpha1.NetworkModePrivate
 		configScript, internalErr := scripts.CreateConfigureScript(
 			maxStorageS,
 			relayPeers,
@@ -91,7 +91,7 @@ func (r *IpfsClusterReconciler) EnsureConfigMapScripts(
 			bloomFilterSize,
 			reproviderInterval,
 			string(reproviderStrategy),
-			isPrivateNetwork,
+			bootstrapPeers,
 		)
 		if internalErr != nil {
 			return fmt.Errorf("could not create config script: %w", internalErr)

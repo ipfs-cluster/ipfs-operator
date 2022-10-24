@@ -34,6 +34,7 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	ma "github.com/multiformats/go-multiaddr"
+	"github.com/redhat-et/ipfs-operator/api/v1alpha1"
 	clusterv1alpha1 "github.com/redhat-et/ipfs-operator/api/v1alpha1"
 )
 
@@ -125,6 +126,7 @@ func (r *IpfsClusterReconciler) createTrackedObjects(
 	var cmScripts *corev1.ConfigMap
 	var relayPeers []peer.AddrInfo
 	var relayStatic []ma.Multiaddr
+	var bootstrapPeers []string
 
 	if _, err = r.ensureSA(ctx, instance); err != nil {
 		return fmt.Errorf("retrieved error while ensuring SA: %w", err)
@@ -138,7 +140,13 @@ func (r *IpfsClusterReconciler) createTrackedObjects(
 	if relayPeers, relayStatic, err = r.EnsureRelayCircuitInfo(ctx, instance); err != nil {
 		return fmt.Errorf("could not retrieve information from the relay circuit: %w", err)
 	}
-	if cmScripts, err = r.EnsureConfigMapScripts(ctx, instance, relayPeers, relayStatic); err != nil {
+	// initialize bootstrap peers if we are on a private network
+	if instance.Spec.Networking.NetworkMode == v1alpha1.NetworkModePrivate {
+		if bootstrapPeers, err = getBootstrapAddrs(secret, relayPeers); err != nil {
+			return fmt.Errorf("could not configure private network: %w", err)
+		}
+	}
+	if cmScripts, err = r.EnsureConfigMapScripts(ctx, instance, relayPeers, relayStatic, bootstrapPeers); err != nil {
 		return fmt.Errorf("could not ensure configmap scripts: %w", err)
 	}
 	if _, err = r.StatefulSet(ctx, instance, svc.Name, secret.ObjectMeta.Name, cmScripts.ObjectMeta.Name); err != nil {
@@ -215,4 +223,23 @@ func (r *IpfsClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: 1,
 		}).Complete(r)
+}
+
+func getBootstrapAddrs(secret *corev1.Secret, relayPeers []peer.AddrInfo) ([]string, error) {
+	bootstrapPeers := []string{}
+	peer0IDKey := KeyPeerIDPrefix + "0"
+	peer0ID, ok := secret.Data[peer0IDKey]
+	if !ok {
+		return nil, fmt.Errorf("could not retrieve initial peer id")
+	}
+	initPeerID := string(peer0ID)
+	// construct a p2p circuit here
+	for _, peer := range relayPeers {
+		circuitID := peer.ID
+		for _, circuitAddr := range peer.Addrs {
+			bootstrapAddr := fmt.Sprintf("%s/p2p/%s/p2p-circuit/p2p/%s", circuitAddr.String(), circuitID.String(), initPeerID)
+			bootstrapPeers = append(bootstrapPeers, bootstrapAddr)
+		}
+	}
+	return bootstrapPeers, nil
 }

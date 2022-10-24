@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"math/rand"
+	"strconv"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	ma "github.com/multiformats/go-multiaddr"
@@ -57,7 +58,7 @@ var _ = Describe("IPFS Reconciler", func() {
 	When("ConfigMapScripts are edited", func() {
 		It("populates the ConfigMap", func() {
 			// configMap is empty
-			configMapScripts, err := ipfsReconciler.EnsureConfigMapScripts(ctx, ipfs, []peer.AddrInfo{}, []ma.Multiaddr{})
+			configMapScripts, err := ipfsReconciler.EnsureConfigMapScripts(ctx, ipfs, []peer.AddrInfo{}, []ma.Multiaddr{}, nil)
 			// should not have errored
 			Expect(err).NotTo(HaveOccurred())
 			// the configmap should be populated with the following scripts
@@ -75,7 +76,7 @@ var _ = Describe("IPFS Reconciler", func() {
 		})
 
 		It("contains the IPFS resource name", func() {
-			configMap, err := ipfsReconciler.EnsureConfigMapScripts(ctx, ipfs, []peer.AddrInfo{}, []ma.Multiaddr{})
+			configMap, err := ipfsReconciler.EnsureConfigMapScripts(ctx, ipfs, []peer.AddrInfo{}, []ma.Multiaddr{}, nil)
 			Expect(configMap).NotTo(BeNil())
 			Expect(err).NotTo(HaveOccurred())
 			Expect(configMap.Name).To(ContainSubstring(myName))
@@ -86,7 +87,7 @@ var _ = Describe("IPFS Reconciler", func() {
 	When("replicas are edited", func() {
 		// we always expect there to be cluster secrets, which have two values
 		const (
-			alwaysKeys = 3
+			alwaysKeys = 4
 		)
 		var (
 			replicas int32
@@ -108,6 +109,13 @@ var _ = Describe("IPFS Reconciler", func() {
 			Expect(err).To(BeNil())
 			secretStringToData(secretConfig)
 			Expect(len(secretConfig.Data)).To(Equal(expectedKeys + 2))
+
+			// expect to be able to peer ID
+			peerID0 := controllers.KeyPeerIDPrefix + strconv.Itoa(0)
+			peerID, ok := secretConfig.Data[peerID0]
+			Expect(ok).To(BeTrue())
+			Expect(peerID).NotTo(BeEmpty())
+			Expect(string(peerID)).NotTo(BeEmpty())
 		})
 	})
 })

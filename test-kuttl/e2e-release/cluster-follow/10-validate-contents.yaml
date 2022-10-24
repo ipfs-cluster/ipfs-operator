@@ -1,6 +1,7 @@
 ---
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
+timeout: 3600
 commands:
   - script: |
       /bin/bash ./10-validate-contents.sh

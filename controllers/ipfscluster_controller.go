@@ -142,6 +142,9 @@ func (r *IpfsClusterReconciler) createTrackedObjects(
 	}
 	// initialize bootstrap peers if we are on a private network
 	if instance.Spec.Networking.NetworkMode == v1alpha1.NetworkModePrivate {
+		if instance.Spec.Replicas < 1 {
+			return fmt.Errorf("number of replicas must be at least 1 to run in private mode")
+		}
 		if bootstrapPeers, err = getBootstrapAddrs(secret, relayPeers); err != nil {
 			return fmt.Errorf("could not configure private network: %w", err)
 		}

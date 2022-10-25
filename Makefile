@@ -321,6 +321,17 @@ chmod a+x "$(1)" ;\
 }
 endef
 
+# download-tool will curl any file $2 and install it to $1, using $3 as an output directory.
+define download-helm
+@[ -f $(1) ] || { \
+set -e ;\
+echo "📥 Downloading $(2)" ;\
+curl -sSLo "$(1).tar.gz" "$(2)" ;\
+tar -zxvf "$(1).tar.gz" -C "$(3)" ;\
+mv "$(3)/linux-amd64/helm" "$(1)" ;\
+}
+endef
+
 .PHONY: kuttl
 KUTTL := $(LOCALBIN)/kuttl
 KUTTL_URL := https://github.com/kudobuilder/kuttl/releases/download/v$(KUTTL_VERSION)/kubectl-kuttl_$(KUTTL_VERSION)_$(OS)_$(SYS_ARCH)
@@ -348,7 +359,7 @@ HELM := $(LOCALBIN)/helm
 HELM_URL := https://get.helm.sh/helm-$(HELM_VERSION)-$(OS)-$(ARCH).tar.gz
 helm: $(HELM) ## Install helm
 $(HELM): $(LOCALBIN)
-	$(call download-tool,$(HELM),$(HELM_URL))
+	$(call download-helm,$(HELM),$(HELM_URL),$(LOCALBIN))
 
 
 .PHONY: golangci-lint

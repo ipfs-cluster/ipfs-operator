@@ -4,10 +4,8 @@ kind: IpfsCluster
 metadata:
   name: ipfs-sample-collab
 spec:
-  url: apps.jephilli-4-11-04-28-0655.devcluster.openshift.com 
   ipfsStorage: 5Ti
   clusterStorage: 20Gi
-  public: true
   replicas: 5
   follows:
     - name: filecoin

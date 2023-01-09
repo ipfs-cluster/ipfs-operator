@@ -12,11 +12,9 @@ Create a file with the following information
    metadata:
      name: ipfs-sample-1
    spec:
-     url: apps.example.com 
      ipfsStorage: 2Gi
      clusterStorage: 2Gi
      replicas: 5
-     public: true
      follows: []
      networking:
        circuitRelays: 1
@@ -28,11 +26,11 @@ Once you have made the necessary adjustments, apply it to your cluster with kube
 
 .. code-block:: bash
 
-  kubectl create namespace my_cluster
-  kubectl -n my_cluster apply -f ipfs.yaml
+  kubectl create namespace mycluster
+  kubectl -n mycluster apply -f ipfs.yaml
 
 Verify that the cluster has started by viewing the status of the cluster.
 
 .. code-block:: bash
 
-  kubectl -n my_namespace status ipfs-sample-1
+  kubectl -n mycluster status ipfs-sample-1

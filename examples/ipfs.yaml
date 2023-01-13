@@ -8,9 +8,9 @@ spec:
   ipfsStorage: 50Gi
   clusterStorage: 5Gi
   clusterApi:
-    strategy: none
+    strategy: LoadBalancer
   gateway:
-    strategy: none
+    strategy: LoadBalancer
   public: true
   replicas: 2
   follows: []

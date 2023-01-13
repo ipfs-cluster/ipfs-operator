@@ -61,7 +61,7 @@ type ReprovideSettings struct {
 }
 
 type ExternalSettings struct {
-	// +kubebuilder:validation:Enum={ingress,loadbalancer,none}
+	// +kubebuilder:validation:Enum={Ingress,LoadBalancer,None}
 	// +optional
 	Strategy ExternalStrategy `json:"strategy,omitempty"`
 	// +optional
@@ -105,8 +105,8 @@ type IpfsClusterSpec struct {
 	// should use when reproviding content.
 	// +optional
 	Reprovider ReprovideSettings `json:"reprovider,omitempty"`
-	Gateway    ExternalSettings  `json:"gateway"`
-	ClusterAPI ExternalSettings  `json:"clusterApi"`
+	Gateway    *ExternalSettings `json:"gateway,omitempty"`
+	ClusterAPI *ExternalSettings `json:"clusterApi,omitempty"`
 }
 
 type IpfsClusterStatus struct {

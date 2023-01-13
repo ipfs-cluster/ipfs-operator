@@ -145,9 +145,6 @@ func (r *IpfsClusterReconciler) createTrackedObjects(
 	mutsa := r.serviceAccount(instance, &sa)
 	mutsvc, svcName := r.serviceCluster(instance, &svc)
 
-	mutgwsvc, _ := r.serviceGateway(instance, &gwsvc)
-	mutapisvc, _ := r.serviceAPI(instance, &apisvc)
-
 	mutCmScripts, cmScriptName := r.ConfigMapScripts(ctx, instance, &cmScripts)
 	mutSecConfig, secConfigName := r.SecretConfig(
 		ctx,
@@ -167,11 +164,17 @@ func (r *IpfsClusterReconciler) createTrackedObjects(
 		&sts:       mutSts,
 	}
 
-	if instance.Spec.Gateway.Strategy == clusterv1alpha1.ExternalStrategyLoadBalancer {
-		trackedObjects[&gwsvc] = mutgwsvc
+	if instance.Spec.Gateway != nil {
+		mutgwsvc, _ := r.serviceGateway(instance, &gwsvc)
+		if instance.Spec.Gateway.Strategy == clusterv1alpha1.ExternalStrategyLoadBalancer {
+			trackedObjects[&gwsvc] = mutgwsvc
+		}
 	}
-	if instance.Spec.ClusterAPI.Strategy == clusterv1alpha1.ExternalStrategyLoadBalancer {
-		trackedObjects[&apisvc] = mutapisvc
+	if instance.Spec.ClusterAPI != nil {
+		mutapisvc, _ := r.serviceAPI(instance, &apisvc)
+		if instance.Spec.ClusterAPI.Strategy == clusterv1alpha1.ExternalStrategyLoadBalancer {
+			trackedObjects[&apisvc] = mutapisvc
+		}
 	}
 	return trackedObjects
 }

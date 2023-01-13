@@ -37,15 +37,15 @@ spec:
             properties:
               clusterApi:
                 properties:
-                  interval:
+                  appendAnnotations:
                     additionalProperties:
                       type: string
                     type: object
                   strategy:
                     enum:
-                    - ingress
-                    - loadbalancer
-                    - none
+                    - Ingress
+                    - LoadBalancer
+                    - None
                     type: string
                 type: object
               clusterStorage:
@@ -72,15 +72,15 @@ spec:
                 type: array
               gateway:
                 properties:
-                  interval:
+                  appendAnnotations:
                     additionalProperties:
                       type: string
                     type: object
                   strategy:
                     enum:
-                    - ingress
-                    - loadbalancer
-                    - none
+                    - Ingress
+                    - LoadBalancer
+                    - None
                     type: string
                 type: object
               ipfsResources:
@@ -160,10 +160,8 @@ spec:
                   Reprovider Describes the settings that each IPFS node
                 type: string
             required:
-            - clusterApi
             - clusterStorage
             - follows
-            - gateway
             - ipfsStorage
             - networking
             - public

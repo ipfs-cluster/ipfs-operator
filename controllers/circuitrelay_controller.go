@@ -214,7 +214,7 @@ func (r *CircuitRelayReconciler) serviceRelay(
 				{
 					Name:       "swarm",
 					Protocol:   corev1.ProtocolTCP,
-					Port:       portSwarm,
+					Port:       portIpfsSwarm,
 					TargetPort: intstr.FromString("swarm"),
 				},
 				// Commented out because some load balancers don't support TCP+UDP:(
@@ -420,18 +420,18 @@ func (r *CircuitRelayReconciler) deploymentRelay(
 							Ports: []corev1.ContainerPort{
 								{
 									Name:          "swarm",
-									ContainerPort: portSwarm,
+									ContainerPort: portIpfsSwarm,
 									Protocol:      "TCP",
 								},
 								{
 									// Should this port number be the same as portSwarm or should it be a different one?
 									Name:          "swarm-udp",
-									ContainerPort: portSwarmUDP,
+									ContainerPort: portIpfsSwarmUDP,
 									Protocol:      "UDP",
 								},
 								{
 									Name:          "pprof",
-									ContainerPort: portPprof,
+									ContainerPort: portIpfsPprof,
 									Protocol:      "UDP",
 								},
 							},

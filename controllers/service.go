@@ -10,67 +10,40 @@ import (
 	clusterv1alpha1 "github.com/redhat-et/ipfs-operator/api/v1alpha1"
 )
 
+// This is an internal service. It exposes the API and gateway ports
 func (r *IpfsClusterReconciler) serviceCluster(
 	m *clusterv1alpha1.IpfsCluster,
 	svc *corev1.Service,
 ) (controllerutil.MutateFn, string) {
-	svcName := "ipfs-cluster-" + m.Name
-	expected := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      svcName,
-			Namespace: m.Namespace,
-			// TODO: annotations for external dns
-		},
-		Spec: corev1.ServiceSpec{
-			Ports: []corev1.ServicePort{
-				{
-					Name:       "swarm",
-					Protocol:   corev1.ProtocolTCP,
-					Port:       portSwarm,
-					TargetPort: intstr.FromString("swarm"),
-				},
-				{
-					Name:       "swarm-udp",
-					Protocol:   corev1.ProtocolUDP,
-					Port:       portSwarmUDP,
-					TargetPort: intstr.FromString("swarm-udp"),
-				},
-				{
-					Name:       "ws",
-					Protocol:   corev1.ProtocolTCP,
-					Port:       portWS,
-					TargetPort: intstr.FromString("ws"),
-				},
-				{
-					Name:       "http",
-					Protocol:   corev1.ProtocolTCP,
-					Port:       portHTTP,
-					TargetPort: intstr.FromString("http"),
-				},
-				{
-					Name:       "api-http",
-					Protocol:   corev1.ProtocolTCP,
-					Port:       portAPIHTTP,
-					TargetPort: intstr.FromString("api-http"),
-				},
-				{
-					Name:       "proxy-http",
-					Protocol:   corev1.ProtocolTCP,
-					Port:       portProxyHTTP,
-					TargetPort: intstr.FromString("proxy-http"),
-				},
-				{
-					Name:       "cluster-swarm",
-					Protocol:   corev1.ProtocolTCP,
-					Port:       portClusterSwarm,
-					TargetPort: intstr.FromString("cluster-swarm"),
-				},
+	svcName := "ipfs-cluster-internal-" + m.Name
+	expected := expectedService(
+		svcName,
+		m.Name,
+		m.Namespace,
+		"ClusterIP",
+		m.Annotations,
+		[]corev1.ServicePort{
+			{
+				Name:       nameIpfsHTTP,
+				Protocol:   corev1.ProtocolTCP,
+				Port:       portIpfsHTTP,
+				TargetPort: intstr.FromString(nameIpfsHTTP),
 			},
-			Selector: map[string]string{
-				"app.kubernetes.io/name": "ipfs-cluster-" + m.Name,
+			{
+				Name:       nameClusterAPI,
+				Protocol:   corev1.ProtocolTCP,
+				Port:       portClusterAPI,
+				TargetPort: intstr.FromString(nameClusterAPI),
+			},
+			{
+				Name:       nameClusterProxy,
+				Protocol:   corev1.ProtocolTCP,
+				Port:       portClusterProxy,
+				TargetPort: intstr.FromString(nameClusterProxy),
 			},
 		},
-	}
+	)
+
 	expected.DeepCopyInto(svc)
 	// FIXME: catch this error before we run the function being returned
 	if err := ctrl.SetControllerReference(m, svc, r.Scheme); err != nil {
@@ -80,4 +53,99 @@ func (r *IpfsClusterReconciler) serviceCluster(
 		svc.Spec = expected.Spec
 		return nil
 	}, svcName
+}
+
+// If enabled, IPFS gateway serivce
+func (r *IpfsClusterReconciler) serviceGateway(
+	m *clusterv1alpha1.IpfsCluster,
+	svc *corev1.Service,
+) (controllerutil.MutateFn, string) {
+	svcName := "ipfs-cluster-gateway-" + m.Name
+	annotations := map[string]string{}
+	for k, v := range m.Spec.Gateway.AppendAnnotations {
+		annotations[k] = v
+	}
+	expected := expectedService(
+		svcName,
+		m.Name,
+		m.Namespace,
+		"LoadBalancer",
+		annotations,
+		[]corev1.ServicePort{
+			{
+				Name:       nameIpfsHTTP,
+				Protocol:   corev1.ProtocolTCP,
+				Port:       portIpfsHTTP,
+				TargetPort: intstr.FromString(nameIpfsHTTP),
+			},
+		},
+	)
+	expected.DeepCopyInto(svc)
+	// FIXME: catch this error before we run the function being returned
+	if err := ctrl.SetControllerReference(m, svc, r.Scheme); err != nil {
+		return func() error { return err }, ""
+	}
+	return func() error {
+		svc.Spec = expected.Spec
+		return nil
+	}, svcName
+}
+
+// If enabled, the cluster API
+func (r *IpfsClusterReconciler) serviceAPI(
+	m *clusterv1alpha1.IpfsCluster,
+	svc *corev1.Service,
+) (controllerutil.MutateFn, string) {
+	svcName := "ipfs-cluster-api-" + m.Name
+	annotations := map[string]string{}
+	for k, v := range m.Spec.ClusterAPI.AppendAnnotations {
+		annotations[k] = v
+	}
+	expected := expectedService(
+		svcName,
+		m.Name,
+		m.Namespace,
+		"LoadBalancer",
+		annotations,
+		[]corev1.ServicePort{
+			{
+				Name:       nameClusterAPI,
+				Protocol:   corev1.ProtocolTCP,
+				Port:       portClusterAPI,
+				TargetPort: intstr.FromString(nameClusterAPI),
+			},
+		},
+	)
+	expected.DeepCopyInto(svc)
+	// FIXME: catch this error before we run the function being returned
+	if err := ctrl.SetControllerReference(m, svc, r.Scheme); err != nil {
+		return func() error { return err }, ""
+	}
+	return func() error {
+		svc.Spec = expected.Spec
+		return nil
+	}, svcName
+}
+
+func expectedService(svcName,
+	relName,
+	namespace string,
+	svcType corev1.ServiceType,
+	annotations map[string]string,
+	ports []corev1.ServicePort) *corev1.Service {
+	expected := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        svcName,
+			Namespace:   namespace,
+			Annotations: annotations,
+		},
+		Spec: corev1.ServiceSpec{
+			Type:  svcType,
+			Ports: ports,
+			Selector: map[string]string{
+				"app.kubernetes.io/name": "ipfs-cluster-" + relName,
+			},
+		},
+	}
+	return expected
 }

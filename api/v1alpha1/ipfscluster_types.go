@@ -35,13 +35,18 @@ const (
 
 type ReproviderStrategy string
 
+type ExternalStrategy string
+
 const (
 	// ReproviderStrategyAll Announces the CID of every stored block.
 	ReproviderStrategyAll ReproviderStrategy = "all"
 	// ReproviderStrategyPinned Only announces the pinned CIDs recursively.
 	ReproviderStrategyPinned ReproviderStrategy = "pinned"
 	// ReproviderStrategyRoots Only announces the root block of explicitly pinned CIDs.
-	ReproviderStrategyRoots ReproviderStrategy = "roots"
+	ReproviderStrategyRoots      ReproviderStrategy = "roots"
+	ExternalStrategyNone         ExternalStrategy   = "None"
+	ExternalStrategyIngress      ExternalStrategy   = "Ingress"
+	ExternalStrategyLoadBalancer ExternalStrategy   = "LoadBalancer"
 )
 
 type ReprovideSettings struct {
@@ -53,6 +58,14 @@ type ReprovideSettings struct {
 	// local content to the routing system. Defaults to '12h'.
 	// +optional
 	Interval string `json:"interval,omitempty"`
+}
+
+type ExternalSettings struct {
+	// +kubebuilder:validation:Enum={Ingress,LoadBalancer,None}
+	// +optional
+	Strategy ExternalStrategy `json:"strategy,omitempty"`
+	// +optional
+	AppendAnnotations map[string]string `json:"appendAnnotations,omitempty"`
 }
 
 type followParams struct {
@@ -69,6 +82,7 @@ type networkConfig struct {
 type IpfsClusterSpec struct {
 	// url defines the URL to be using as an ingress controller.
 	// +kubebuilder:validation:Optional
+	// Reprovider Describes the settings that each IPFS node
 	URL string `json:"url"`
 	// public determines whether or not we should be exposing this IPFS Cluster to the public.
 	Public bool `json:"public"`
@@ -91,6 +105,8 @@ type IpfsClusterSpec struct {
 	// should use when reproviding content.
 	// +optional
 	Reprovider ReprovideSettings `json:"reprovider,omitempty"`
+	Gateway    *ExternalSettings `json:"gateway,omitempty"`
+	ClusterAPI *ExternalSettings `json:"clusterApi,omitempty"`
 }
 
 type IpfsClusterStatus struct {

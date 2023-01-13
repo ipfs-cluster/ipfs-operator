@@ -35,6 +35,19 @@ spec:
           spec:
             description: IpfsClusterSpec defines the desired state of the IpfsCluster.
             properties:
+              clusterApi:
+                properties:
+                  appendAnnotations:
+                    additionalProperties:
+                      type: string
+                    type: object
+                  strategy:
+                    enum:
+                    - Ingress
+                    - LoadBalancer
+                    - None
+                    type: string
+                type: object
               clusterStorage:
                 anyOf:
                 - type: integer
@@ -57,6 +70,19 @@ spec:
                   - template
                   type: object
                 type: array
+              gateway:
+                properties:
+                  appendAnnotations:
+                    additionalProperties:
+                      type: string
+                    type: object
+                  strategy:
+                    enum:
+                    - Ingress
+                    - LoadBalancer
+                    - None
+                    type: string
+                type: object
               ipfsResources:
                 description: ipfsResources specifies the resource requirements for
                   each IPFS container. If this value is omitted, then the operator
@@ -131,6 +157,7 @@ spec:
                 type: object
               url:
                 description: url defines the URL to be using as an ingress controller.
+                  Reprovider Describes the settings that each IPFS node
                 type: string
             required:
             - clusterStorage

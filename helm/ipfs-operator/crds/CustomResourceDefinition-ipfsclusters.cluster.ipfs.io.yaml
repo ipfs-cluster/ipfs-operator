@@ -37,7 +37,7 @@ spec:
             properties:
               clusterApi:
                 properties:
-                  interval:
+                  appendAnnotations:
                     additionalProperties:
                       type: string
                     type: object
@@ -72,7 +72,7 @@ spec:
                 type: array
               gateway:
                 properties:
-                  interval:
+                  appendAnnotations:
                     additionalProperties:
                       type: string
                     type: object
@@ -160,10 +160,8 @@ spec:
                   Reprovider Describes the settings that each IPFS node
                 type: string
             required:
-            - clusterApi
             - clusterStorage
             - follows
-            - gateway
             - ipfsStorage
             - networking
             - public

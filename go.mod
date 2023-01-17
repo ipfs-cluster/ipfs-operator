@@ -7,7 +7,6 @@ require (
 	github.com/ipfs-cluster/ipfs-cluster v1.0.4
 	github.com/ipfs/kubo v0.17.0
 	github.com/libp2p/go-libp2p v0.23.4
-	github.com/libp2p/go-libp2p-core v0.20.1
 	github.com/libp2p/go-libp2p-relay-daemon v0.1.1-0.20220720133550-bd5627c90f06
 	github.com/multiformats/go-multiaddr v0.8.0
 	github.com/onsi/ginkgo/v2 v2.7.0
@@ -127,6 +126,7 @@ require (
 	github.com/libp2p/go-flow-metrics v0.1.0 // indirect
 	github.com/libp2p/go-libp2p-asn-util v0.2.0 // indirect
 	github.com/libp2p/go-libp2p-consensus v0.0.1 // indirect
+	github.com/libp2p/go-libp2p-core v0.20.1 // indirect
 	github.com/libp2p/go-libp2p-gorpc v0.5.0 // indirect
 	github.com/libp2p/go-libp2p-gostream v0.5.0 // indirect
 	github.com/libp2p/go-libp2p-http v0.4.0 // indirect

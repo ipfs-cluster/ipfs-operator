@@ -239,8 +239,9 @@ func applyIPFSClusterK8sDefaults(conf *config.Config, storageMax string, peers [
 	conf.Addresses.API = config.Strings{"/ip4/0.0.0.0/tcp/5001"}
 	conf.Addresses.Gateway = config.Strings{"/ip4/0.0.0.0/tcp/8080"}
 	highWater := &config.OptionalInteger{}
-	highWater.UnmarshalJSON([]byte("2000"))
-	conf.Swarm.ConnMgr.HighWater = highWater
+	if err := highWater.UnmarshalJSON([]byte("2000")); err == nil {
+		conf.Swarm.ConnMgr.HighWater = highWater
+	}
 	conf.Datastore.BloomFilterSize = 1048576
 	conf.Datastore.StorageMax = storageMax
 	conf.Addresses.Swarm = []string{"/ip4/0.0.0.0/tcp/4001", "/ip6/::/tcp/4001"}

@@ -7,7 +7,10 @@ import (
 
 func GetDefaultServiceConfig() *cmdutils.ConfigHelper {
 	cfgHelper := cmdutils.NewConfigHelper("", "", "crdt", "badger")
-	cfgHelper.Manager().Default()
+	err := cfgHelper.Manager().Default()
+	if err != nil {
+		return nil
+	}
 	return cfgHelper
 }
 

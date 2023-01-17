@@ -6,7 +6,7 @@ on:
     branches: ["main"]
 
 env:
-  GO_VERSION: "1.18"
+  GO_VERSION: "1.19"
   GO111MODULE: "on"
   OPERATOR_IMAGE: "quay.io/redhat-et-ipfs/ipfs-operator"
   BUNDLE_IMAGE: "quay.io/redhat-et-ipfs/ipfs-operator-bundle"

@@ -17,7 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	ma "github.com/multiformats/go-multiaddr"

@@ -10,7 +10,7 @@ import (
 
 	"github.com/alecthomas/units"
 	"github.com/ipfs/kubo/config"
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 	ma "github.com/multiformats/go-multiaddr"
 	clusterv1alpha1 "github.com/redhat-et/ipfs-operator/api/v1alpha1"
 	"github.com/redhat-et/ipfs-operator/controllers/scripts"
@@ -101,6 +101,17 @@ func (r *IpfsClusterReconciler) ConfigMapScripts(
 		string(reproviderStrategy),
 	)
 
+	serviceConfig := GetDefaultServiceConfig()
+	if m.Spec.Stats {
+		EnableMetrics(serviceConfig.Configs())
+	}
+
+	serviceConfigFile, err := serviceConfig.Manager().ToJSON()
+	if err != nil {
+		log.Error(err, "could not marshal service config file")
+		return utils.ErrFunc(fmt.Errorf("error converting serviceConfig to JSON: %w", err)), ""
+	}
+
 	expected := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cmName,
@@ -109,6 +120,7 @@ func (r *IpfsClusterReconciler) ConfigMapScripts(
 		Data: map[string]string{
 			"entrypoint.sh":     scripts.IPFSClusterEntrypoint,
 			"configure-ipfs.sh": configScript,
+			"service.json":      string(serviceConfigFile),
 		},
 	}
 	expected.DeepCopyInto(cm)

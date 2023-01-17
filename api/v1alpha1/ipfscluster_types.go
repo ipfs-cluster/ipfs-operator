@@ -86,6 +86,9 @@ type IpfsClusterSpec struct {
 	// should use when reproviding content.
 	// +optional
 	Reprovider ReprovideSettings `json:"reprovider,omitempty"`
+	// stats determines whether metrics should be enabled.
+	// +optional
+	Stats bool `json:"stats"`
 }
 
 type IpfsClusterStatus struct {

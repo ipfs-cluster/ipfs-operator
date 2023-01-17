@@ -125,6 +125,9 @@ spec:
                     - roots
                     type: string
                 type: object
+              stats:
+                description: stats determines whether metrics should be enabled.
+                type: boolean
             required:
             - clusterStorage
             - follows

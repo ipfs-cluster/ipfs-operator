@@ -22,7 +22,7 @@ count_pins() {
 	declare pinTypeRecursive="recursive"
 
 	# ensure that the corresponding IPFS container has pinned content
-  pins=$(kubectl exec "${podName}" -n "${NAMESPACE}" -c "${followContainerName}" -- ipfs pin ls | grep -i "${pinTypeRecursive}")
+  pins=$(kubectl exec "${podName}" -n "${NAMESPACE}" -c "${followContainerName}" -- ipfs-cluster-ctl pin ls | grep -i "${pinTypeRecursive}")
 	readarray -d $'\n' -t pinArray <<< "${pins}"
 	echo "${#pinArray[*]}"
 }

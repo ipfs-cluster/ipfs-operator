@@ -23,10 +23,8 @@ kind: Ipfs
 metadata:
   name: ipfs-sample-1
 spec:
-  url: apps.jephilli-4-11-04-28-0655.devcluster.openshift.com 
   ipfsStorage: 2Gi
   clusterStorage: 2Gi
-  public: true
 ```
 Once the values match your environment run the following.
 ```bash

@@ -8,7 +8,6 @@ metadata:
 spec:
   ipfsStorage: 2Gi
   clusterStorage: 1Gi
-  public: false
   replicas: 1
   follows: []
   networking:

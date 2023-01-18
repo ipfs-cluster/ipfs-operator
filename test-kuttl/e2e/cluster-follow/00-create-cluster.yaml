@@ -13,7 +13,7 @@ spec:
   ipfsResources:
     limits:
       cpu: 250m
-      memory: 512M
+      memory: 700M
   follows:
   - name: gutenberg_es
     template: gutenberg-es.collab.ipfscluster.io 

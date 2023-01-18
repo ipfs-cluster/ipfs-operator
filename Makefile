@@ -2,6 +2,7 @@
 GOLANGCI_VERSION := v1.46.1
 HELM_VERSION := v3.8.2
 KUTTL_VERSION := 0.10.0
+GINKGO_VERSION := v2.7.0
 
 
 OS := $(shell go env GOOS)
@@ -322,7 +323,7 @@ kuttl: ## Download kuttl
 
 .PHONY: ginkgo
 GINKGO := $(LOCALBIN)/ginkgo
-GINKGO_URL := github.com/onsi/ginkgo/v2/ginkgo
+GINKGO_URL := github.com/onsi/ginkgo/v2/ginkgo@$(GINKGO_VERSION)
 ginkgo: $(GINKGO) ## Install ginkgo
 $(GINKGO): $(LOCALBIN)
 	$(call go-install-mod-tool,$(LOCALBIN),$(GINKGO_URL))

@@ -4,3 +4,7 @@ kind: TestSuite
 testDirs:
   - ./e2e
 timeout: 600
+parallel: 1
+collectors:
+  type: command
+  command: kubectl -n "$NAMESPACE" describe all

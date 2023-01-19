@@ -137,7 +137,7 @@ test: lint manifests generate fmt vet lint envtest ginkgo ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GINKGO) run $(GINKGO_ARGS) $(GINKGO_TARGETS)
 
 .PHONY: test-e2e
-test-e2e: kuttl ## Run e2e tests. Requires cluster w/ Scribe already installed
+test-e2e: kuttl ## Run e2e tests. Requires cluster w/ IPFS Operator already installed.
 	cd test-kuttl && $(KUTTL) test 
 	rm -f test-kuttl/kubeconfig
 
@@ -318,7 +318,8 @@ endef
 .PHONY: kuttl
 KUTTL := $(LOCALBIN)/kuttl
 KUTTL_URL := https://github.com/kudobuilder/kuttl/releases/download/v$(KUTTL_VERSION)/kubectl-kuttl_$(KUTTL_VERSION)_linux_x86_64
-kuttl: ## Download kuttl
+kuttl: $(KUTTL) ## Download kuttl
+$(KUTTL): $(LOCALBIN) 
 	$(call download-tool,$(KUTTL),$(KUTTL_URL))
 
 .PHONY: ginkgo

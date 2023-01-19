@@ -4,7 +4,6 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.8.0
   creationTimestamp: null
-  labels: {}
   name: ipfsclusters.cluster.ipfs.io
 spec:
   group: cluster.ipfs.io
@@ -33,10 +32,19 @@ spec:
           metadata:
             type: object
           spec:
+            description: IpfsClusterSpec defines the desired state of the IpfsCluster.
             properties:
               clusterStorage:
-                type: string
+                anyOf:
+                - type: integer
+                - type: string
+                description: clusterStorage defines the amount of storage to be used
+                  by IPFS Cluster.
+                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                x-kubernetes-int-or-string: true
               follows:
+                description: follows defines the list of other IPFS Clusters this
+                  one should follow.
                 items:
                   properties:
                     name:
@@ -48,13 +56,45 @@ spec:
                   - template
                   type: object
                 type: array
+              ipfsResources:
+                description: ipfsResources specifies the resource requirements for
+                  each IPFS container. If this value is omitted, then the operator
+                  will automatically determine these settings based on the storage
+                  sizes used.
+                properties:
+                  limits:
+                    additionalProperties:
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                      x-kubernetes-int-or-string: true
+                    description: 'Limits describes the maximum amount of compute resources
+                      allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                    type: object
+                  requests:
+                    additionalProperties:
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                      x-kubernetes-int-or-string: true
+                    description: 'Requests describes the minimum amount of compute
+                      resources required. If Requests is omitted for a container,
+                      it defaults to Limits if that is explicitly specified, otherwise
+                      to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                    type: object
+                type: object
               ipfsStorage:
                 anyOf:
                 - type: integer
                 - type: string
+                description: ipfsStorage defines the total storage to be allocated
+                  by this resource.
                 pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                 x-kubernetes-int-or-string: true
               networking:
+                description: networking defines network configuration settings.
                 properties:
                   circuitRelays:
                     format: int32
@@ -62,13 +102,13 @@ spec:
                 required:
                 - circuitRelays
                 type: object
-              public:
-                type: boolean
               replicas:
+                description: replicas sets the number of replicas of IPFS Cluster
+                  nodes we should be running.
                 format: int32
                 type: integer
               reprovider:
-                description: Reprovider Describes the settings that each IPFS node
+                description: reprovider Describes the settings that each IPFS node
                   should use when reproviding content.
                 properties:
                   interval:
@@ -84,14 +124,11 @@ spec:
                     - roots
                     type: string
                 type: object
-              url:
-                type: string
             required:
             - clusterStorage
             - follows
             - ipfsStorage
             - networking
-            - public
             - replicas
             type: object
           status:

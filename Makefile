@@ -1,7 +1,7 @@
 # set binary versions
 GOLANGCI_VERSION := v1.46.1
 HELM_VERSION := v3.8.2
-KUTTL_VERSION := 0.10.0
+KUTTL_VERSION := 0.15.0
 GINKGO_VERSION := v2.7.0
 
 
@@ -317,7 +317,7 @@ endef
 
 .PHONY: kuttl
 KUTTL := $(LOCALBIN)/kuttl
-KUTTL_URL := https://github.com/kudobuilder/kuttl/releases/download/v$(KUTTL_VERSION)/kubectl-kuttl_$(KUTTL_VERSION)_linux_x86_64
+KUTTL_URL := https://github.com/kudobuilder/kuttl/releases/download/v$(KUTTL_VERSION)/kubectl-kuttl_$(KUTTL_VERSION)_$(OS)_$(ARCH)
 kuttl: $(KUTTL) ## Download kuttl
 $(KUTTL): $(LOCALBIN) 
 	$(call download-tool,$(KUTTL),$(KUTTL_URL))

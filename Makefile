@@ -138,8 +138,12 @@ test: lint manifests generate fmt vet lint envtest ginkgo ## Run tests.
 
 .PHONY: test-e2e
 test-e2e: kuttl ## Run e2e tests. Requires cluster w/ IPFS Operator already installed.
-	cd test-kuttl && $(KUTTL) test 
+	cd test-kuttl && $(KUTTL) test --config kuttl-test.yaml
 	rm -f test-kuttl/kubeconfig
+
+.PHONY: test-e2e-release
+test-e2e-release: kuttl
+	cd test-kuttl && $(KUTTL) test --config kuttl-test-release.yaml
 
 ##@ Build
 

@@ -7,6 +7,7 @@ GINKGO_VERSION := v2.7.0
 
 OS := $(shell go env GOOS)
 ARCH := $(shell go env GOARCH)
+SYS_ARCH := $(shell uname -m)
 
 # VERSION defines the project version for the bundle.
 # Update this value when you upgrade the version of your project.
@@ -321,7 +322,7 @@ endef
 
 .PHONY: kuttl
 KUTTL := $(LOCALBIN)/kuttl
-KUTTL_URL := https://github.com/kudobuilder/kuttl/releases/download/v$(KUTTL_VERSION)/kubectl-kuttl_$(KUTTL_VERSION)_$(OS)_$(ARCH)
+KUTTL_URL := https://github.com/kudobuilder/kuttl/releases/download/v$(KUTTL_VERSION)/kubectl-kuttl_$(KUTTL_VERSION)_$(OS)_$(SYS_ARCH)
 kuttl: $(KUTTL) ## Download kuttl
 $(KUTTL): $(LOCALBIN) 
 	$(call download-tool,$(KUTTL),$(KUTTL_URL))

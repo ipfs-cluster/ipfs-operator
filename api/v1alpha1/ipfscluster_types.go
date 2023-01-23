@@ -67,11 +67,6 @@ type networkConfig struct {
 
 // IpfsClusterSpec defines the desired state of the IpfsCluster.
 type IpfsClusterSpec struct {
-	// url defines the URL to be using as an ingress controller.
-	// +kubebuilder:validation:Optional
-	URL string `json:"url"`
-	// public determines whether or not we should be exposing this IPFS Cluster to the public.
-	Public bool `json:"public"`
 	// ipfsStorage defines the total storage to be allocated by this resource.
 	IpfsStorage resource.Quantity `json:"ipfsStorage"`
 	// clusterStorage defines the amount of storage to be used by IPFS Cluster.

@@ -102,10 +102,6 @@ spec:
                 required:
                 - circuitRelays
                 type: object
-              public:
-                description: public determines whether or not we should be exposing
-                  this IPFS Cluster to the public.
-                type: boolean
               replicas:
                 description: replicas sets the number of replicas of IPFS Cluster
                   nodes we should be running.
@@ -128,15 +124,11 @@ spec:
                     - roots
                     type: string
                 type: object
-              url:
-                description: url defines the URL to be using as an ingress controller.
-                type: string
             required:
             - clusterStorage
             - follows
             - ipfsStorage
             - networking
-            - public
             - replicas
             type: object
           status:

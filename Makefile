@@ -1,12 +1,13 @@
 # set binary versions
 GOLANGCI_VERSION := v1.46.1
 HELM_VERSION := v3.8.2
-KUTTL_VERSION := 0.10.0
+KUTTL_VERSION := 0.15.0
 GINKGO_VERSION := v2.7.0
 
 
 OS := $(shell go env GOOS)
 ARCH := $(shell go env GOARCH)
+SYS_ARCH := $(shell uname -m)
 
 # VERSION defines the project version for the bundle.
 # Update this value when you upgrade the version of your project.
@@ -137,9 +138,13 @@ test: lint manifests generate fmt vet lint envtest ginkgo ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GINKGO) run $(GINKGO_ARGS) $(GINKGO_TARGETS)
 
 .PHONY: test-e2e
-test-e2e: kuttl ## Run e2e tests. Requires cluster w/ Scribe already installed
-	cd test-kuttl && $(KUTTL) test 
+test-e2e: kuttl ## Run e2e tests. Requires cluster w/ IPFS Operator already installed.
+	cd test-kuttl && $(KUTTL) test --config kuttl-test.yaml
 	rm -f test-kuttl/kubeconfig
+
+.PHONY: test-e2e-release
+test-e2e-release: kuttl
+	cd test-kuttl && $(KUTTL) test --config kuttl-test-release.yaml
 
 ##@ Build
 
@@ -317,8 +322,9 @@ endef
 
 .PHONY: kuttl
 KUTTL := $(LOCALBIN)/kuttl
-KUTTL_URL := https://github.com/kudobuilder/kuttl/releases/download/v$(KUTTL_VERSION)/kubectl-kuttl_$(KUTTL_VERSION)_linux_x86_64
-kuttl: ## Download kuttl
+KUTTL_URL := https://github.com/kudobuilder/kuttl/releases/download/v$(KUTTL_VERSION)/kubectl-kuttl_$(KUTTL_VERSION)_$(OS)_$(SYS_ARCH)
+kuttl: $(KUTTL) ## Download kuttl
+$(KUTTL): $(LOCALBIN) 
 	$(call download-tool,$(KUTTL),$(KUTTL_URL))
 
 .PHONY: ginkgo

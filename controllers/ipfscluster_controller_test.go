@@ -46,7 +46,7 @@ var _ = Describe("IPFS Reconciler", func() {
 			// should not have errored
 			Expect(fn()).NotTo(HaveOccurred())
 			// the configmap should be populated with the following scripts
-			Expect(len(configMapScripts.Data)).To(Equal(2))
+			Expect(len(configMapScripts.Data)).To(Equal(3))
 
 			expectedKeys := []string{
 				controllers.ScriptConfigureIPFS,

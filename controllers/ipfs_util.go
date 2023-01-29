@@ -6,8 +6,8 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	ci "github.com/libp2p/go-libp2p-core/crypto"
-	peer "github.com/libp2p/go-libp2p-core/peer"
+	ci "github.com/libp2p/go-libp2p/core/crypto"
+	peer "github.com/libp2p/go-libp2p/core/peer"
 )
 
 func newClusterSecret() (string, error) {

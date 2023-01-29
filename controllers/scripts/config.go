@@ -10,7 +10,7 @@ import (
 
 	"github.com/alecthomas/units"
 	"github.com/ipfs/kubo/config"
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 type configureIpfsOpts struct {
@@ -92,6 +92,8 @@ run_ipfs_cluster() {
 	log "🔍 reading hostname"
 	PEER_HOSTNAME=$(cat /proc/sys/kernel/hostname)
 	log "starting ipfs-cluster on ${PEER_HOSTNAME}"
+	cp /custom/service.json /data/ipfs-cluster/
+	sed -i '/peername/c\   \"peername\" : \"'$PEER_HOSTNAME'\",' /data/ipfs-cluster/service.json
 
 	grep -q ".*-0$" /proc/sys/kernel/hostname
 	if [ $? -eq 0 ]; then
@@ -236,7 +238,10 @@ func applyIPFSClusterK8sDefaults(conf *config.Config, storageMax string, peers [
 	conf.Bootstrap = config.DefaultBootstrapAddresses
 	conf.Addresses.API = config.Strings{"/ip4/0.0.0.0/tcp/5001"}
 	conf.Addresses.Gateway = config.Strings{"/ip4/0.0.0.0/tcp/8080"}
-	conf.Swarm.ConnMgr.HighWater = 2000
+	highWater := &config.OptionalInteger{}
+	if err := highWater.UnmarshalJSON([]byte("2000")); err == nil {
+		conf.Swarm.ConnMgr.HighWater = highWater
+	}
 	conf.Datastore.BloomFilterSize = 1048576
 	conf.Datastore.StorageMax = storageMax
 	conf.Addresses.Swarm = []string{"/ip4/0.0.0.0/tcp/4001", "/ip6/::/tcp/4001"}

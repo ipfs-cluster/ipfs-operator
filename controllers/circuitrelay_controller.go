@@ -50,7 +50,7 @@ const (
 	// MountPathSecret Defines where the secret for the relaycircuit will be mounted.
 	MountPathSecret = "/secret-data"
 	// CircuitRelayImage Defines the image which will be used by the relayCircuit if not overridden.
-	CircuitRelayImage = "coryschwartz/libp2p-relay-daemon:latest"
+	CircuitRelayImage = "quay.io/redhat-et-ipfs/libp2p-relay-daemon:v0.4.0"
 )
 
 // CircuitRelayReconciler reconciles a CircuitRelay object.

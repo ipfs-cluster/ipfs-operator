@@ -135,7 +135,6 @@ spec:
                 type: object
             required:
             - clusterStorage
-            - follows
             - ipfsStorage
             - networking
             - replicas

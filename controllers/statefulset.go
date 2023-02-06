@@ -56,6 +56,8 @@ const (
 	ipfsMountPath = "/data/ipfs"
 	// ipfsImage Defines which image we should pull when running IPFS containers.
 	ipfsImage = "docker.io/ipfs/kubo:v0.16.0"
+	// ipfsNodeDataMountPath Defines the directory where secrets will be mounted.
+	ipfsNodeDataMountPath = "/node-data"
 )
 
 const (
@@ -140,7 +142,7 @@ func (r *IpfsClusterReconciler) StatefulSet(
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      "ipfs-storage",
-									MountPath: "/data/ipfs",
+									MountPath: ipfsMountPath,
 								},
 								{
 									Name:      "configure-script",
@@ -148,7 +150,7 @@ func (r *IpfsClusterReconciler) StatefulSet(
 								},
 								{
 									Name:      "ipfs-node-data",
-									MountPath: "/node-data",
+									MountPath: ipfsNodeDataMountPath,
 								},
 							},
 							Env: configureIPFSEnvs,

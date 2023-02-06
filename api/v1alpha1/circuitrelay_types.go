@@ -70,7 +70,17 @@ func (a *AddrInfoBasicType) DeepCopy() *AddrInfoBasicType {
 	return out
 }
 
+// KeyRef Defines a reference to a specific key on a certain secret.
+type KeyRef struct {
+	KeyName    string `json:"keyName"`
+	SecretName string `json:"secretName"`
+}
+
+// CircuitRelaySpec Defines a specification for the RelayCircuit launched by Kubernetes.
 type CircuitRelaySpec struct {
+	// SwarmKeyRef points to a multicodec-encoded v1 PSK stored within a secret somewhere.
+	// +optional
+	SwarmKeyRef *KeyRef `json:"swarmKeyRef,omitempty"`
 }
 
 type CircuitRelayStatus struct {

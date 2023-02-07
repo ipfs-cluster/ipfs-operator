@@ -12,7 +12,11 @@ import (
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-func (r *IpfsClusterReconciler) EnsureCircuitRelay(ctx context.Context, m *clusterv1alpha1.IpfsCluster, secret *corev1.Secret) (err error) {
+func (r *IpfsClusterReconciler) EnsureCircuitRelay(
+	ctx context.Context,
+	m *clusterv1alpha1.IpfsCluster,
+	secret *corev1.Secret,
+) (err error) {
 	log := ctrllog.FromContext(ctx)
 	if err = r.createCircuitRelays(ctx, m, secret); err != nil {
 		return fmt.Errorf("cannot create circuit relays: %w", err)

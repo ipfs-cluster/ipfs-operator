@@ -4,3 +4,4 @@ kind: TestSuite
 testDirs:
   - ./e2e
 timeout: 120
+parallel: 1

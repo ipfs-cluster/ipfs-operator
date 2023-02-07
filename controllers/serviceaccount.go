@@ -2,7 +2,8 @@ package controllers
 
 import (
 	"context"
-	"log"
+
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	clusterv1alpha1 "github.com/redhat-et/ipfs-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
@@ -13,7 +14,8 @@ import (
 
 func (r *IpfsClusterReconciler) ensureSA(ctx context.Context, m *clusterv1alpha1.IpfsCluster) (*corev1.ServiceAccount,
 	error) {
-	log.Println("ensuring service account")
+	logger := log.FromContext(ctx)
+	logger.Info("ensuring service account")
 	// Define a new Service Account object
 	sa := &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
@@ -28,9 +30,9 @@ func (r *IpfsClusterReconciler) ensureSA(ctx context.Context, m *clusterv1alpha1
 		return nil
 	})
 	if err != nil {
-		log.Printf("could not create serviceOrUpdate service account: %s\n", err.Error())
+		logger.Error(err, "failed to create serviceaccount")
 		return nil, err
 	}
-	log.Println("completed operation:", res)
+	logger.Info("created serviceaccount", "result", res)
 	return sa, nil
 }

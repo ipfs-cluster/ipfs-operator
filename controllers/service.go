@@ -3,7 +3,6 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"log"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -11,6 +10,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	clusterv1alpha1 "github.com/redhat-et/ipfs-operator/api/v1alpha1"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // ensureServiceCluster Returns the existing IPFS cluster service object or an error.
@@ -18,6 +18,7 @@ func (r *IpfsClusterReconciler) ensureServiceCluster(
 	ctx context.Context,
 	m *clusterv1alpha1.IpfsCluster,
 ) (*corev1.Service, error) {
+	logger := log.FromContext(ctx)
 	svcName := "ipfs-cluster-" + m.Name
 	svc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -27,7 +28,7 @@ func (r *IpfsClusterReconciler) ensureServiceCluster(
 		},
 	}
 
-	log.Println("creating or updating svc")
+	logger.Info("creating or updating svc")
 	op, err := ctrl.CreateOrUpdate(ctx, r.Client, svc, func() error {
 		svc.Spec = corev1.ServiceSpec{}
 		svc.Spec.Ports = []corev1.ServicePort{
@@ -83,9 +84,9 @@ func (r *IpfsClusterReconciler) ensureServiceCluster(
 		return nil
 	})
 	if err != nil {
-		log.Printf("failed on operation %s\n", op)
+		logger.Error(err, "failed on operation", "operation", op)
 		return nil, fmt.Errorf("failed to create service: %w", err)
 	}
-	fmt.Printf("completed operation: %s\n", op)
+	logger.Info("completed operation", "operation", op)
 	return svc, nil
 }

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"log"
 	"math"
 	"strconv"
 	"text/template"
@@ -12,6 +11,7 @@ import (
 	"github.com/alecthomas/units"
 	"github.com/ipfs/kubo/config"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type configureIpfsOpts struct {
@@ -175,10 +175,10 @@ func CreateConfigureScript(
 	}
 
 	if bootstrapAddrs != nil {
-		log.Printf("overriding bootstrap adders: %+v", bootstrapAddrs)
+		log.Log.Info("overriding bootstrap addresses", "bootstrapAddrs", bootstrapAddrs)
 		config.Bootstrap = bootstrapAddrs
 	} else {
-		log.Println("keeping bootstrap adders default")
+		log.Log.Info("keeping bootstrap adders default")
 	}
 
 	// convert config settings into json string

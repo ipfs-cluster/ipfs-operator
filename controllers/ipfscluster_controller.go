@@ -84,28 +84,6 @@ func (r *IpfsClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, r.Update(ctx, instance)
 	}
 
-	if err = r.createCircuitRelays(ctx, instance); err != nil {
-		return ctrl.Result{}, fmt.Errorf("cannot create circuit relays: %w", err)
-	}
-
-	// Check the status of circuit relays.
-	// wait for them to complte so we can determine announce addresses.
-	for _, relayName := range instance.Status.CircuitRelays {
-		relay := clusterv1alpha1.CircuitRelay{}
-		relay.Name = relayName
-		relay.Namespace = instance.Namespace
-		if err = r.Client.Get(ctx, client.ObjectKeyFromObject(&relay), &relay); err != nil {
-			return ctrl.Result{Requeue: true}, fmt.Errorf("could not lookup circuitRelay %q: %w", relayName, err)
-		}
-		if relay.Status.AddrInfo.ID == "" {
-			log.Info("relay is not ready yet. Will continue waiting.", "relay", relayName)
-			return failResult, nil
-		}
-	}
-	if err = r.Status().Update(ctx, instance); err != nil {
-		return ctrl.Result{}, err
-	}
-
 	// Reconcile the tracked objects
 	err = r.createTrackedObjects(ctx, instance)
 	if err != nil {
@@ -136,6 +114,9 @@ func (r *IpfsClusterReconciler) createTrackedObjects(
 	}
 	if secret, err = r.EnsureSecretConfig(ctx, instance); err != nil {
 		return fmt.Errorf("failed to ensure secret config: %w", err)
+	}
+	if err = r.EnsureCircuitRelay(ctx, instance, secret); err != nil {
+		return fmt.Errorf("failed to ensure circuit relays: %w", err)
 	}
 	if relayPeers, relayStatic, err = r.EnsureRelayCircuitInfo(ctx, instance); err != nil {
 		return fmt.Errorf("could not retrieve information from the relay circuit: %w", err)
@@ -176,41 +157,6 @@ func (r *IpfsClusterReconciler) ensureIPFSCluster(
 	}
 	// Error reading the object - requeue the request.
 	return nil, fmt.Errorf("failed to get Ipfs: %w", err)
-}
-
-// createCircuitRelays Creates the necessary amount of circuit relays if any are missing.
-// FIXME: if we change the number of CircuitRelays, we should update
-// the IPFS config file as well.
-func (r *IpfsClusterReconciler) createCircuitRelays(
-	ctx context.Context,
-	instance *clusterv1alpha1.IpfsCluster,
-) error {
-	// do nothing
-	if len(instance.Status.CircuitRelays) >= int(instance.Spec.Networking.CircuitRelays) {
-		// FIXME: handle scale-down of circuit relays
-		return nil
-	}
-	// create the CircuitRelays
-	for i := 0; int32(i) < instance.Spec.Networking.CircuitRelays; i++ {
-		name := fmt.Sprintf("%s-%d", instance.Name, i)
-		relay := clusterv1alpha1.CircuitRelay{}
-		relay.Name = name
-		relay.Namespace = instance.Namespace
-		if err := ctrl.SetControllerReference(instance, &relay, r.Scheme); err != nil {
-			return fmt.Errorf(
-				"cannot set controller reference for new circuitRelay: %w, circuitRelay: %s",
-				err, relay.Name,
-			)
-		}
-		if err := r.Create(ctx, &relay); err != nil {
-			return fmt.Errorf("cannot create new circuitRelay: %w", err)
-		}
-		instance.Status.CircuitRelays = append(instance.Status.CircuitRelays, relay.Name)
-	}
-	if err := r.Status().Update(ctx, instance); err != nil {
-		return err
-	}
-	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

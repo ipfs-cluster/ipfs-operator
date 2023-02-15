@@ -13,5 +13,5 @@ spec:
       cpu: 100m
       memory: 128M
   networking:
-    networkMode: private
+    public: false
     circuitRelays: 1

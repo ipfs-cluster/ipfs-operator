@@ -9,7 +9,7 @@ spec:
   replicas: 1
   networking:
     circuitRelays: 1
-    networkMode: public
+    public: false
   ipfsResources:
     limits:
       cpu: 250m

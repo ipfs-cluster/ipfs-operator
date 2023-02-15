@@ -44,17 +44,6 @@ const (
 	ReproviderStrategyRoots ReproviderStrategy = "roots"
 )
 
-type NetworkMode string
-
-const (
-	// NetworkModePublic Defines an IPFSCluster running in public mode with its
-	// content available to everyone.
-	NetworkModePublic NetworkMode = "public"
-	// NetworkModePrivate Defines an IPFSCluster running in a private network
-	// with its content only available to other authorized nodes.
-	NetworkModePrivate NetworkMode = "private"
-)
-
 type ReprovideSettings struct {
 	// Strategy specifies the reprovider strategy, defaults to 'all'.
 	// +kubebuilder:validation:Enum={all,pinned,roots}
@@ -75,10 +64,10 @@ type followParams struct {
 type NetworkConfig struct {
 	// circuitRelays defines how many CircuitRelays should be created.
 	CircuitRelays int32 `json:"circuitRelays"`
-	// networkMode is a switch which defines whether this IPFSCluster will use
+	// public is a switch which defines whether this IPFSCluster will use
 	// the global IPFS network or create its own.
-	// +kubebuilder:validation:Enum={public,private}
-	NetworkMode NetworkMode `json:"networkMode,omitempty"`
+	// +kubebuilder:default:=true
+	Public bool `json:"public,omitempty"`
 }
 
 // IpfsClusterSpec defines the desired state of the IpfsCluster.

@@ -34,7 +34,6 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	ma "github.com/multiformats/go-multiaddr"
-	"github.com/redhat-et/ipfs-operator/api/v1alpha1"
 	clusterv1alpha1 "github.com/redhat-et/ipfs-operator/api/v1alpha1"
 )
 
@@ -122,7 +121,7 @@ func (r *IpfsClusterReconciler) createTrackedObjects(
 		return fmt.Errorf("could not retrieve information from the relay circuit: %w", err)
 	}
 	// initialize bootstrap peers if we are on a private network
-	if instance.Spec.Networking.NetworkMode == v1alpha1.NetworkModePrivate {
+	if !instance.Spec.Networking.Public {
 		if instance.Spec.Replicas < 1 {
 			return fmt.Errorf("number of replicas must be at least 1 to run in private mode")
 		}

@@ -22,7 +22,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2023-02-07T20:51:55Z"
+    createdAt: "2023-02-15T21:07:11Z"
     operators.operatorframework.io/builder: operator-sdk-v1.26.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
   name: ipfs-operator.v0.0.1

@@ -100,7 +100,7 @@ func (r *IpfsClusterReconciler) StatefulSet(
 			Name:  "IPFS_FD_MAX",
 			Value: "4096",
 		}}
-		if m.Spec.Networking.NetworkMode == clusterv1alpha1.NetworkModePrivate {
+		if !m.Spec.Networking.Public {
 			swarmKeySecret := corev1.EnvVar{
 				Name: EnvIPFSSwarmKey,
 				ValueFrom: &corev1.EnvVarSource{

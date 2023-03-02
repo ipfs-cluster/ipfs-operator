@@ -1,6 +1,7 @@
 #!/bin/bash
-set -eo pipefail
+# set -eo pipefail
 
+echo "whoami: $(whoami)"
 
 # imports
 echo "sourcing utils.sh"
@@ -31,6 +32,12 @@ main() {
   echo "checking for ipfs-cluster-ctl"
   local ipfsClusterCMD=$(kubectl exec -n "${NAMESPACE}" "${ipfsClusterPodName}" -c ipfs-cluster -- sh -c 'which ipfs-cluster-ctl')
   echo "ipfs-cluster-ctl: ${ipfsClusterCMD}"
+  echo "checking permissions to use ipfs-cluster-ctl:"
+  local ipfsClusterCtlPerms=$(kubectl exec -n "${NAMESPACE}" "${ipfsClusterPodName}" -c ipfs-cluster -- sh -c 'ls -al /usr/local/bin/ipfs-cluster-ctl')
+  echo "perms: ${ipfsClusterCtlPerms}"
+  echo "checking container user:"
+  local ctrUser=$(kubectl exec -n "${NAMESPACE}" "${ipfsClusterPodName}" -c ipfs-cluster -- sh -c 'whoami')
+  echo "continer user: ${ctrUser}"
 
   # this fails
   echo "grabbing the content ID"

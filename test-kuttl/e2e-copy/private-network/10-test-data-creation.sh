@@ -20,6 +20,11 @@ main() {
   echo "writing a file to ${ipfsClusterPodName}"
   local results=$(kubectl exec -n "${NAMESPACE}" "${ipfsClusterPodName}" -c ipfs-cluster -- sh -c 'echo "hello from ${HOSTNAME} at $(date)" > /tmp/testfile.txt')
   echo "results of write: ${results}"
+
+  echo "reading namespace details"
+  results=$(kubectl get pod -n "${NAMESPACE}" -o yaml)
+  echo "pods:"
+  echo "${results}"
   echo "grabbing the content ID"
   myCID=$(kubectl exec -n "${NAMESPACE}" "${ipfsClusterPodName}" -c ipfs-cluster -- sh -c 'ipfs-cluster-ctl add /tmp/testfile.txt' | awk '{print $2}')
   echo "content ID is: ${myCID}"

@@ -7,6 +7,7 @@ echo "sourcing utils.sh"
 source './utils.sh'
 
 
+echo "checking to see if awk is installed: '$(which awk)'"
 
 main() {
   echo "this is the first message once the script begins to run"
@@ -19,12 +20,8 @@ main() {
   # write a file to the ipfs-cluster container in the pod
   echo "writing a file to ${ipfsClusterPodName}"
   local results=$(kubectl exec -n "${NAMESPACE}" "${ipfsClusterPodName}" -c ipfs-cluster -- sh -c 'echo "hello from ${HOSTNAME} at $(date)" > /tmp/testfile.txt')
-  echo "results of write: ${results}"
 
-  echo "reading namespace details"
-  results=$(kubectl get pod -n "${NAMESPACE}" -o yaml)
-  echo "pods:"
-  echo "${results}"
+  # this fails
   echo "grabbing the content ID"
   myCID=$(kubectl exec -n "${NAMESPACE}" "${ipfsClusterPodName}" -c ipfs-cluster -- sh -c 'ipfs-cluster-ctl add /tmp/testfile.txt' | awk '{print $2}')
   echo "content ID is: ${myCID}"

@@ -1,0 +1,17 @@
+---
+apiVersion: cluster.ipfs.io/v1alpha1
+kind: IpfsCluster
+metadata:
+  name: private-ipfs
+spec:
+  ipfsStorage: 2Gi
+  clusterStorage: 2Gi
+  replicas: 2
+  follows: []
+  ipfsResources:
+    limits:
+      cpu: 100m
+      memory: 128M
+  networking:
+    public: false
+    circuitRelays: 1

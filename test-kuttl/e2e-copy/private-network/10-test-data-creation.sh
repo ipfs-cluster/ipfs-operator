@@ -30,7 +30,7 @@ main() {
   echo "file contents: '${contents}'"
   echo "checking for ipfs-cluster-ctl"
   local ipfsClusterCMD=$(kubectl exec -n "${NAMESPACE}" "${ipfsClusterPodName}" -c ipfs-cluster -- sh -c 'which ipfs-cluster-ctl')
-  echo "ipfs-cluster-ctl: $(ipfsClusterCMD)"
+  echo "ipfs-cluster-ctl: ${ipfsClusterCMD}"
 
   # this fails
   echo "grabbing the content ID"

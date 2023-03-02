@@ -81,7 +81,13 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v2
-
+    - name: Test commands
+      shell: bash
+      run: |
+          # display path
+          echo "${PATH}"
+          # display where awk is
+          echo $(whereis awk)
     - name: Install the Kubectl binary
       run: |
         curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"

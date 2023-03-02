@@ -39,6 +39,10 @@ main() {
   local ctrUser=$(kubectl exec -n "${NAMESPACE}" "${ipfsClusterPodName}" -c ipfs-cluster -- sh -c 'whoami')
   echo "continer user: ${ctrUser}"
 
+  # delete the lockfile if it exists
+  kubectl exec -n "${NAMESPACE}" "${ipfsClusterPodName}" -c ipfs-cluster -- sh -c 'if [ -e /data/ipfs/repo.lock ]; then rm /data/ipfs/repo.lock; fi'
+
+
   # this fails
   echo "grabbing the content ID"
   myCID=$(kubectl exec -n "${NAMESPACE}" "${ipfsClusterPodName}" -c ipfs-cluster -- sh -c 'ipfs-cluster-ctl add /tmp/testfile.txt' | awk '{print $2}')

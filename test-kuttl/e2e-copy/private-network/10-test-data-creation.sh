@@ -53,7 +53,11 @@ main() {
   ipfsClusterPodname2=$(kubectl get pod -n "${NAMESPACE}" -l "${labelName}=${labelValue}" -o jsonpath='{.items[1].metadata.name}')
   
   # delete the lockfile if it exists
+  echo "deleting the other lockfile now"
   kubectl exec -n "${NAMESPACE}" "${ipfsClusterPodname2}" -c ipfs-cluster -- sh -c 'if [ -e /data/ipfs/repo.lock ]; then rm /data/ipfs/repo.lock; fi'
+  echo "checking to see if lockfile still exists"
+  results=$(kubectl exec -n "${NAMESPACE}" "${ipfsClusterPodname2}" -c ipfs-cluster -- sh -c 'ls -al /data/ipfs' | grep 'repo.lock')
+  echo "lockfile: ${results}"
 
   ipfsCommand="ipfs get --output /tmp/myfile.txt -- ${myCID}" 
   echo "reading a file from ${ipfsClusterPodname2} using command: '${ipfsCommand}'"

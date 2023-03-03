@@ -1,5 +1,5 @@
 #!/bin/bash
-# set -eo pipefail
+set -eo pipefail
 
 echo "whoami: $(whoami)"
 
@@ -51,6 +51,10 @@ main() {
   # read the value
   echo "getting the other ipfs cluster podname"
   ipfsClusterPodname2=$(kubectl get pod -n "${NAMESPACE}" -l "${labelName}=${labelValue}" -o jsonpath='{.items[1].metadata.name}')
+  
+  # delete the lockfile if it exists
+  kubectl exec -n "${NAMESPACE}" "${ipfsClusterPodname2}" -c ipfs-cluster -- sh -c 'if [ -e /data/ipfs/repo.lock ]; then rm /data/ipfs/repo.lock; fi'
+
   ipfsCommand="ipfs get --output /tmp/myfile.txt -- ${myCID}" 
   echo "reading a file from ${ipfsClusterPodname2} using command: '${ipfsCommand}'"
   kubectl exec -n "${NAMESPACE}" "${ipfsClusterPodname2}" -c ipfs -- sh -c "${ipfsCommand}"

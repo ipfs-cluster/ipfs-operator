@@ -45,7 +45,7 @@ main() {
 
   # this fails
   echo "grabbing the content ID"
-  myCID=$(kubectl exec -n "${NAMESPACE}" "${ipfsClusterPodName}" -c ipfs-cluster -- sh -c 'ipfs-cluster-ctl add /tmp/testfile.txt' | awk '{print $2}')
+  myCID=$(kubectl exec -n "${NAMESPACE}" "${ipfsClusterPodName}" -c ipfs-cluster -- sh -c 'if [ -e /data/ipfs/repo.lock ]; then rm /data/ipfs/repo.lock; fi; ipfs-cluster-ctl add /tmp/testfile.txt' | awk '{print $2}')
   echo "content ID is: ${myCID}"
   
   # read the value
@@ -59,7 +59,7 @@ main() {
   results=$(kubectl exec -n "${NAMESPACE}" "${ipfsClusterPodname2}" -c ipfs-cluster -- sh -c 'ls -al /data/ipfs' | grep 'repo.lock')
   echo "lockfile: ${results}"
 
-  ipfsCommand="ipfs get --output /tmp/myfile.txt -- ${myCID}" 
+  ipfsCommand="if [ -e /data/ipfs/repo.lock ]; then rm /data/ipfs/repo.lock; fi; ipfs get --output /tmp/myfile.txt -- ${myCID}" 
   echo "reading a file from ${ipfsClusterPodname2} using command: '${ipfsCommand}'"
   kubectl exec -n "${NAMESPACE}" "${ipfsClusterPodname2}" -c ipfs -- sh -c "${ipfsCommand}"
   echo "success!"

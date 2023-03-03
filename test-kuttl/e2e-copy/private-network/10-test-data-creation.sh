@@ -45,8 +45,15 @@ main() {
 
   # this fails
   echo "grabbing the content ID"
-  myCID=$(kubectl exec -n "${NAMESPACE}" "${ipfsClusterPodName}" -c ipfs-cluster -- sh -c 'if [ -e /data/ipfs/repo.lock ]; then rm /data/ipfs/repo.lock; fi; ipfs-cluster-ctl add /tmp/testfile.txt' | awk '{print $2}')
+  myCID=""
+  until [[ -n $myCID ]]; do
+    myCID=$(kubectl exec -n "${NAMESPACE}" "${ipfsClusterPodName}" -c ipfs-cluster -- sh -c 'if [ -e /data/ipfs/repo.lock ]; then rm /data/ipfs/repo.lock; fi; ipfs-cluster-ctl add /tmp/testfile.txt' | awk '{print $2}') || true
+    [[ -z $myCID ]] && sleep 5
+    echo "trying again"
+  done
   echo "content ID is: ${myCID}"
+
+  # myCID=$(kubectl exec -n "${NAMESPACE}" "${ipfsClusterPodName}" -c ipfs-cluster -- sh -c 'if [ -e /data/ipfs/repo.lock ]; then rm /data/ipfs/repo.lock; fi; ipfs-cluster-ctl add /tmp/testfile.txt' | awk '{print $2}')
   
   # read the value
   echo "getting the other ipfs cluster podname"
@@ -54,14 +61,20 @@ main() {
   
   # delete the lockfile if it exists
   echo "deleting the other lockfile now"
-  kubectl exec -n "${NAMESPACE}" "${ipfsClusterPodname2}" -c ipfs-cluster -- sh -c 'if [ -e /data/ipfs/repo.lock ]; then rm /data/ipfs/repo.lock; fi'
-  echo "checking to see if lockfile still exists"
-  results=$(kubectl exec -n "${NAMESPACE}" "${ipfsClusterPodname2}" -c ipfs-cluster -- sh -c 'ls -al /data/ipfs' | grep 'repo.lock')
-  echo "lockfile: ${results}"
+  # kubectl exec -n "${NAMESPACE}" "${ipfsClusterPodname2}" -c ipfs-cluster -- sh -c 'if [ -e /data/ipfs/repo.lock ]; then rm /data/ipfs/repo.lock; fi'
+  # echo "checking to see if lockfile still exists"
+  # results=$(kubectl exec -n "${NAMESPACE}" "${ipfsClusterPodname2}" -c ipfs-cluster -- sh -c 'ls -al /data/ipfs' | grep 'repo.lock')
+  # echo "lockfile: ${results}"
 
   ipfsCommand="if [ -e /data/ipfs/repo.lock ]; then rm /data/ipfs/repo.lock; fi; ipfs get --output /tmp/myfile.txt -- ${myCID}" 
+
   echo "reading a file from ${ipfsClusterPodname2} using command: '${ipfsCommand}'"
-  kubectl exec -n "${NAMESPACE}" "${ipfsClusterPodname2}" -c ipfs -- sh -c "${ipfsCommand}"
+  until kubectl exec -n "${NAMESPACE}" "${ipfsClusterPodname2}" -c ipfs -- sh -c "${ipfsCommand}"; do
+    echo "failed, sleeping..."
+    sleep 5
+  done
+
+  # kubectl exec -n "${NAMESPACE}" "${ipfsClusterPodname2}" -c ipfs -- sh -c "${ipfsCommand}"
   echo "success!"
 }
 

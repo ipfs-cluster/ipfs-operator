@@ -2,5 +2,6 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestSuite
 testDirs:
-  - ./e2e
+  - ./e2e-copy
 timeout: 120
+parallel: 1

@@ -1,0 +1,15 @@
+# This IPFS resource is designed for running on laptops
+# without many resources.
+---
+apiVersion: cluster.ipfs.io/v1alpha1
+kind: IpfsCluster
+metadata:
+  name: ipfs-cluster-small
+spec:
+  ipfsStorage: 2Gi
+  clusterStorage: 1Gi
+  replicas: 1
+  follows: []
+  networking:
+    circuitRelays: 1
+    public: false

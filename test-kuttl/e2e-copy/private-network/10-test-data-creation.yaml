@@ -1,0 +1,7 @@
+---
+kind: TestStep
+apiVersion: kuttl.dev/v1beta1
+timeout: 900
+commands:
+  - script: |
+      /bin/bash ./10-test-data-creation.sh

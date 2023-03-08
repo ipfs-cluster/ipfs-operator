@@ -60,9 +60,14 @@ type followParams struct {
 	Template string `json:"template"`
 }
 
-// networkConfig defines the configuration structure used for networking.
-type networkConfig struct {
+// NetworkConfig defines the configuration structure used for networking.
+type NetworkConfig struct {
+	// circuitRelays defines how many CircuitRelays should be created.
 	CircuitRelays int32 `json:"circuitRelays"`
+	// public is a switch which defines whether this IPFSCluster will use
+	// the global IPFS network or create its own.
+	// +kubebuilder:default:=true
+	Public bool `json:"public,omitempty"`
 }
 
 // IpfsClusterSpec defines the desired state of the IpfsCluster.
@@ -74,9 +79,10 @@ type IpfsClusterSpec struct {
 	// replicas sets the number of replicas of IPFS Cluster nodes we should be running.
 	Replicas int32 `json:"replicas"`
 	// networking defines network configuration settings.
-	Networking networkConfig `json:"networking"`
+	Networking NetworkConfig `json:"networking"`
 	// follows defines the list of other IPFS Clusters this one should follow.
-	Follows []followParams `json:"follows"`
+	// +optional
+	Follows []*followParams `json:"follows,omitempty"`
 	// ipfsResources specifies the resource requirements for each IPFS container. If this
 	// value is omitted, then the operator will automatically determine these settings
 	// based on the storage sizes used.

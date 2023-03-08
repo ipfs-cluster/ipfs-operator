@@ -6,10 +6,10 @@ metadata:
 spec:
   clusterStorage: 1Gi
   ipfsStorage: 2Gi
-  public: false 
   replicas: 1
   networking:
     circuitRelays: 1
+    public: false
   ipfsResources:
     limits:
       cpu: 250m

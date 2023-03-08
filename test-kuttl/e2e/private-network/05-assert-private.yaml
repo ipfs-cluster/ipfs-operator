@@ -1,0 +1,16 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+collectors:
+  - type: command
+    command: kubectl -n "$NAMESPACE" describe all,ipfscluster
+  - type: command
+    command: kubectl -n ipfs-operator-system logs deployment/ipfs-operator-controller-manager
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: ipfs-cluster-private-ipfs 
+status:
+  currentReplicas: 2
+  readyReplicas: 2

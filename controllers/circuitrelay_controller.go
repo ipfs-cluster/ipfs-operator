@@ -36,14 +36,21 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	"github.com/libp2p/go-libp2p-core/crypto"
-	peer "github.com/libp2p/go-libp2p-core/peer"
 	relaydaemon "github.com/libp2p/go-libp2p-relay-daemon"
+	"github.com/libp2p/go-libp2p/core/crypto"
+	peer "github.com/libp2p/go-libp2p/core/peer"
 	relayv2 "github.com/libp2p/go-libp2p/p2p/protocol/circuitv2/relay"
 	clusterv1alpha1 "github.com/redhat-et/ipfs-operator/api/v1alpha1"
 	"github.com/redhat-et/ipfs-operator/controllers/utils"
 
 	ma "github.com/multiformats/go-multiaddr"
+)
+
+const (
+	// MountPathSecret Defines where the secret for the relaycircuit will be mounted.
+	MountPathSecret = "/secret-data"
+	// CircuitRelayImage Defines the image which will be used by the relayCircuit if not overridden.
+	CircuitRelayImage = "quay.io/redhat-et-ipfs/libp2p-relay-daemon:v0.4.0"
 )
 
 // CircuitRelayReconciler reconciles a CircuitRelay object.
@@ -181,7 +188,7 @@ func (r *CircuitRelayReconciler) generateNewIdentity(
 	instance.Status.AddrInfo.Addrs = addrStrings
 	var privkey crypto.PrivKey
 	var pubkey peer.ID
-	privkey, pubkey, err = newKey()
+	privkey, pubkey, err = utils.NewKey()
 	if err != nil {
 		return nil, fmt.Errorf("error during key generation: %w", err)
 	}
@@ -384,95 +391,116 @@ func (r *CircuitRelayReconciler) configRelay(
 	}
 }
 
+// nolint:funlen // This is just putting together a Deployment object, only one bit of logic actually exists
 func (r *CircuitRelayReconciler) deploymentRelay(
 	m *clusterv1alpha1.CircuitRelay,
 	dep *appsv1.Deployment,
 ) controllerutil.MutateFn {
 	depName := "libp2p-relay-daemon-" + m.Name
-	expected := appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      depName,
-			Namespace: m.Namespace,
+	expected := appsv1.Deployment{}
+	expected.ObjectMeta.Name = depName
+	expected.ObjectMeta.Namespace = m.Namespace
+	expected.Spec.Selector = &metav1.LabelSelector{
+		MatchLabels: map[string]string{
+			"app.kubernetes.io/name": depName,
 		},
-		Spec: appsv1.DeploymentSpec{
-			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{
-					"app.kubernetes.io/name": depName,
+	}
+	expected.Spec.Template.ObjectMeta.Labels = map[string]string{
+		"app.kubernetes.io/name": depName,
+	}
+	relayDaemonCtr := corev1.Container{}
+	relayDaemonCtr.Name = "relay"
+	relayDaemonCtr.Image = CircuitRelayImage
+	relayDaemonCtr.Args = []string{
+		"-config",
+		"/config.json",
+		"-id",
+		"/identity",
+	}
+
+	relayDaemonCtr.Ports = []corev1.ContainerPort{
+		{
+			Name:          "swarm",
+			ContainerPort: portSwarm,
+			Protocol:      "TCP",
+		},
+		{
+			// Should this port number be the same as portSwarm or should it be a different one?
+			Name:          "swarm-udp",
+			ContainerPort: portSwarmUDP,
+			Protocol:      "UDP",
+		},
+		{
+			Name:          "pprof",
+			ContainerPort: portPprof,
+			Protocol:      "UDP",
+		},
+	}
+	relayDaemonCtr.VolumeMounts = []corev1.VolumeMount{
+		{
+			Name:      "config",
+			MountPath: "/config.json",
+			SubPath:   "config.json",
+		},
+		{
+			Name:      "identity",
+			MountPath: "/identity",
+			SubPath:   "identity",
+		},
+	}
+
+	expected.Spec.Template.Spec.Volumes = []corev1.Volume{
+		{
+			Name: "config",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "libp2p-relay-daemon-config-" + m.Name,
+					},
 				},
 			},
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"app.kubernetes.io/name": depName,
-					},
-				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Name:  "relay",
-							Image: "coryschwartz/libp2p-relay-daemon:latest",
-							Args: []string{
-								"-config",
-								"/config.json",
-								"-id",
-								"/identity",
-							},
-							Ports: []corev1.ContainerPort{
-								{
-									Name:          "swarm",
-									ContainerPort: portSwarm,
-									Protocol:      "TCP",
-								},
-								{
-									// Should this port number be the same as portSwarm or should it be a different one?
-									Name:          "swarm-udp",
-									ContainerPort: portSwarmUDP,
-									Protocol:      "UDP",
-								},
-								{
-									Name:          "pprof",
-									ContainerPort: portPprof,
-									Protocol:      "UDP",
-								},
-							},
-							VolumeMounts: []corev1.VolumeMount{
-								{
-									Name:      "config",
-									MountPath: "/config.json",
-									SubPath:   "config.json",
-								},
-								{
-									Name:      "identity",
-									MountPath: "/identity",
-									SubPath:   "identity",
-								},
-							},
-						},
-					},
-					Volumes: []corev1.Volume{
-						{
-							Name: "config",
-							VolumeSource: corev1.VolumeSource{
-								ConfigMap: &corev1.ConfigMapVolumeSource{
-									LocalObjectReference: corev1.LocalObjectReference{
-										Name: "libp2p-relay-daemon-config-" + m.Name,
-									},
-								},
-							},
-						},
-						{
-							Name: "identity",
-							VolumeSource: corev1.VolumeSource{
-								Secret: &corev1.SecretVolumeSource{
-									SecretName: "libp2p-relay-daemon-identity-" + m.Name,
-								},
-							},
-						},
-					},
+		},
+		{
+			Name: "identity",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "libp2p-relay-daemon-identity-" + m.Name,
 				},
 			},
 		},
 	}
+	// tell the circuitrelay where it can locate the swarm key
+	if m.Spec.SwarmKeyRef != nil {
+		log.Log.Info("detected private swarm key")
+		swarmKeyFileName := "swarm.psk"
+		expected.Spec.Template.Spec.Volumes = append(expected.Spec.Template.Spec.Volumes, corev1.Volume{
+			Name: "swarm-key-secret",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: m.Spec.SwarmKeyRef.SecretName,
+					Items: []corev1.KeyToPath{
+						{
+							Key:  m.Spec.SwarmKeyRef.KeyName,
+							Path: swarmKeyFileName,
+						},
+					},
+				},
+			},
+		})
+		swarmKeyMount := corev1.VolumeMount{
+			Name:      m.Spec.SwarmKeyRef.SecretName,
+			ReadOnly:  true,
+			MountPath: MountPathSecret,
+		}
+		relayDaemonCtr.VolumeMounts = append(relayDaemonCtr.VolumeMounts, swarmKeyMount)
+		swarmKeyFile := MountPathSecret + "/" + swarmKeyFileName
+		relayDaemonCtr.Args = append(relayDaemonCtr.Args, "-swarmkey", swarmKeyFile)
+		log.Log.Info("loaded swarmkey into circuit relay")
+	}
+	expected.Spec.Template.Spec.Containers = []corev1.Container{
+		relayDaemonCtr,
+	}
+	log.Log.Info("loaded values", "deployment", expected)
 	expected.DeepCopyInto(dep)
 	// FIXME: return an error before returning a function which errors
 	if err := ctrl.SetControllerReference(m, dep, r.Scheme); err != nil {

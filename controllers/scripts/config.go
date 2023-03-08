@@ -10,7 +10,8 @@ import (
 
 	"github.com/alecthomas/units"
 	"github.com/ipfs/kubo/config"
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type configureIpfsOpts struct {
@@ -33,15 +34,21 @@ PEER_ID=$(cat "/node-data/peerID-${INDEX}")
 
 if [[ -f /data/ipfs/config ]]; then
 	if [[ -f /data/ipfs/repo.lock ]]; then
+	 	echo "removing /data/ipfs/repo.lock"
 		rm /data/ipfs/repo.lock
 	fi
+	echo "skipping configuration because /data/ipfs/config already exists!"
 	exit 0
+else 
+	echo "no data found, initializing from fresh start"
 fi
 
 echo '{{ .FlattenedConfig }}' > config.json
 sed -i s,_peer-id_,"${PEER_ID}",g config.json
 sed -i s,_private-key_,"${PRIVATE_KEY}",g config.json
 
+echo "initializing IPFS from config:"
+echo $(cat config.json)
 ipfs init -- config.json
 
 chown -R ipfs: /data/ipfs
@@ -151,17 +158,28 @@ func CreateConfigureScript(
 	bloomFilterSize int64,
 	reproviderInterval string,
 	reproviderStrategy string,
+	bootstrapAddrs []string,
 ) (string, error) {
 	// set settings
 	configureTmpl, _ := template.New("configureIpfs").Parse(configureIpfs)
-	config, err := createTemplateConfig(storageMax, peers, relayConfig)
+	config, err := createTemplateConfig(
+		storageMax,
+		peers,
+		relayConfig,
+		bloomFilterSize,
+		reproviderInterval,
+		reproviderStrategy,
+	)
 	if err != nil {
 		return "", err
 	}
-	config.Swarm.RelayClient = relayConfig
-	config.Datastore.BloomFilterSize = int(bloomFilterSize)
-	config.Reprovider.Interval = reproviderInterval
-	config.Reprovider.Strategy = reproviderStrategy
+
+	if bootstrapAddrs != nil {
+		log.Log.Info("overriding bootstrap addresses", "bootstrapAddrs", bootstrapAddrs)
+		config.Bootstrap = bootstrapAddrs
+	} else {
+		log.Log.Info("keeping bootstrap adders default")
+	}
 
 	// convert config settings into json string
 	configBytes, err := json.Marshal(config)
@@ -256,6 +274,9 @@ func createTemplateConfig(
 	storageMax string,
 	peers []peer.AddrInfo,
 	rc config.RelayClient,
+	bloomFilterSize int64,
+	reproviderInterval string,
+	reproviderStrategy string,
 ) (conf config.Config, err error) {
 	// attempt to generate an identity
 
@@ -271,6 +292,12 @@ func createTemplateConfig(
 		return
 	}
 	applyIPFSClusterK8sDefaults(&conf, storageMax, peers, rc)
+
+	conf.Swarm.RelayClient = rc
+	conf.Datastore.BloomFilterSize = int(bloomFilterSize)
+	conf.Reprovider.Interval = reproviderInterval
+	conf.Reprovider.Strategy = reproviderStrategy
+
 	return
 }
 

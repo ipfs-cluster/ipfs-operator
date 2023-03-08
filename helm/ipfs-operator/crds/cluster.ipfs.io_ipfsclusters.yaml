@@ -1,3 +1,4 @@
+---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
@@ -97,8 +98,15 @@ spec:
                 description: networking defines network configuration settings.
                 properties:
                   circuitRelays:
+                    description: circuitRelays defines how many CircuitRelays should
+                      be created.
                     format: int32
                     type: integer
+                  public:
+                    default: true
+                    description: public is a switch which defines whether this IPFSCluster
+                      will use the global IPFS network or create its own.
+                    type: boolean
                 required:
                 - circuitRelays
                 type: object
@@ -126,7 +134,6 @@ spec:
                 type: object
             required:
             - clusterStorage
-            - follows
             - ipfsStorage
             - networking
             - replicas

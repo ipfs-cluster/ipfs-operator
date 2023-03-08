@@ -32,9 +32,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
+	ma "github.com/multiformats/go-multiaddr"
 	clusterv1alpha1 "github.com/redhat-et/ipfs-operator/api/v1alpha1"
-	"github.com/redhat-et/ipfs-operator/controllers/utils"
 )
 
 const (
@@ -61,10 +61,11 @@ type IpfsClusterReconciler struct {
 
 func (r *IpfsClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
+	failResult := ctrl.Result{RequeueAfter: time.Second * 15}
 	// Fetch the Ipfs instance
 	instance, err := r.ensureIPFSCluster(ctx, req)
 	if err != nil {
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("failed to ensure ipfscluster: %w", err)
 	}
 
 	// Add finalizer for this CR
@@ -72,7 +73,7 @@ func (r *IpfsClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		controllerutil.AddFinalizer(instance, finalizer)
 		err = r.Update(ctx, instance)
 		if err != nil {
-			return ctrl.Result{}, err
+			return ctrl.Result{}, fmt.Errorf("failed to update instance: %w", err)
 		}
 		return ctrl.Result{Requeue: true}, nil
 	}
@@ -82,86 +83,59 @@ func (r *IpfsClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, r.Update(ctx, instance)
 	}
 
-	// generate a new ID
-	var peerid peer.ID
-	var privStr string
-	if peerid, privStr, err = generateIdentity(); err != nil {
-		log.Error(err, "failed to generate identity")
-		return ctrl.Result{}, err
-	}
-
-	clusSec, err := newClusterSecret()
-	if err != nil {
-		log.Error(err, "cannot generate new cluster secret")
-		return ctrl.Result{}, err
-	}
-
-	if err = r.createCircuitRelays(ctx, instance); err != nil {
-		log.Error(err, "cannot create circuit relays")
-		return ctrl.Result{}, err
-	}
-
-	// Check the status of circuit relays.
-	// wait for them to complte so we can determine announce addresses.
-	for _, relayName := range instance.Status.CircuitRelays {
-		relay := clusterv1alpha1.CircuitRelay{}
-		relay.Name = relayName
-		relay.Namespace = instance.Namespace
-		if err = r.Client.Get(ctx, client.ObjectKeyFromObject(&relay), &relay); err != nil {
-			log.Error(err, "could not lookup circuitRelay", "relay", relayName)
-			return ctrl.Result{Requeue: true}, err
-		}
-		if relay.Status.AddrInfo.ID == "" {
-			log.Info("relay is not ready yet. Will continue waiting.", "relay", relayName)
-			return ctrl.Result{RequeueAfter: time.Second * 15}, nil
-		}
-	}
-	if err = r.Status().Update(ctx, instance); err != nil {
-		return ctrl.Result{}, err
-	}
-
 	// Reconcile the tracked objects
-	trackedObjects := r.createTrackedObjects(ctx, instance, peerid, clusSec, privStr)
-	shouldRequeue := utils.CreateOrPatchTrackedObjects(ctx, trackedObjects, r.Client, log)
-	return ctrl.Result{Requeue: shouldRequeue}, nil
+	err = r.createTrackedObjects(ctx, instance)
+	if err != nil {
+		log.Error(err, "failed to reconcile ipfscluster")
+		return failResult, err
+	}
+	return ctrl.Result{Requeue: false}, nil
 }
 
 // createTrackedObjects Creates a mapping from client objects to their mutating functions.
 func (r *IpfsClusterReconciler) createTrackedObjects(
 	ctx context.Context,
 	instance *clusterv1alpha1.IpfsCluster,
-	peerID peer.ID,
-	clusterSecret string,
-	privateString string,
-) map[client.Object]controllerutil.MutateFn {
-	sa := corev1.ServiceAccount{}
-	svc := corev1.Service{}
-	cmScripts := corev1.ConfigMap{}
-	secConfig := corev1.Secret{}
-	sts := appsv1.StatefulSet{}
+) error {
+	var err error
+	var svc *corev1.Service
+	var secret *corev1.Secret
+	var cmScripts *corev1.ConfigMap
+	var relayPeers []peer.AddrInfo
+	var relayStatic []ma.Multiaddr
+	var bootstrapPeers []string
 
-	mutsa := r.serviceAccount(instance, &sa)
-	mutsvc, svcName := r.serviceCluster(instance, &svc)
-
-	mutCmScripts, cmScriptName := r.ConfigMapScripts(ctx, instance, &cmScripts)
-	mutSecConfig, secConfigName := r.SecretConfig(
-		ctx,
-		instance,
-		&secConfig,
-		[]byte(clusterSecret),
-		[]byte(privateString),
-		peerID.String(),
-	)
-	mutSts := r.StatefulSet(instance, &sts, svcName, secConfigName, cmScriptName)
-
-	trackedObjects := map[client.Object]controllerutil.MutateFn{
-		&sa:        mutsa,
-		&svc:       mutsvc,
-		&cmScripts: mutCmScripts,
-		&secConfig: mutSecConfig,
-		&sts:       mutSts,
+	if _, err = r.ensureSA(ctx, instance); err != nil {
+		return fmt.Errorf("retrieved error while ensuring SA: %w", err)
 	}
-	return trackedObjects
+	if svc, err = r.ensureServiceCluster(ctx, instance); err != nil {
+		return fmt.Errorf("could not ensure service cluster: %w", err)
+	}
+	if secret, err = r.EnsureSecretConfig(ctx, instance); err != nil {
+		return fmt.Errorf("failed to ensure secret config: %w", err)
+	}
+	if err = r.EnsureCircuitRelay(ctx, instance, secret); err != nil {
+		return fmt.Errorf("failed to ensure circuit relays: %w", err)
+	}
+	if relayPeers, relayStatic, err = r.EnsureRelayCircuitInfo(ctx, instance); err != nil {
+		return fmt.Errorf("could not retrieve information from the relay circuit: %w", err)
+	}
+	// initialize bootstrap peers if we are on a private network
+	if !instance.Spec.Networking.Public {
+		if instance.Spec.Replicas < 1 {
+			return fmt.Errorf("number of replicas must be at least 1 to run in private mode")
+		}
+		if bootstrapPeers, err = getBootstrapAddrs(secret, relayPeers); err != nil {
+			return fmt.Errorf("could not configure private network: %w", err)
+		}
+	}
+	if cmScripts, err = r.EnsureConfigMapScripts(ctx, instance, relayPeers, relayStatic, bootstrapPeers); err != nil {
+		return fmt.Errorf("could not ensure configmap scripts: %w", err)
+	}
+	if _, err = r.StatefulSet(ctx, instance, svc.Name, secret.ObjectMeta.Name, cmScripts.ObjectMeta.Name); err != nil {
+		return fmt.Errorf("could not ensure statefulset: %w", err)
+	}
+	return nil
 }
 
 // ensureIPFSCluster Attempts to obtain an IPFS Cluster resource, and error if not found.
@@ -184,41 +158,6 @@ func (r *IpfsClusterReconciler) ensureIPFSCluster(
 	return nil, fmt.Errorf("failed to get Ipfs: %w", err)
 }
 
-// createCircuitRelays Creates the necessary amount of circuit relays if any are missing.
-// FIXME: if we change the number of CircuitRelays, we should update
-// the IPFS config file as well.
-func (r *IpfsClusterReconciler) createCircuitRelays(
-	ctx context.Context,
-	instance *clusterv1alpha1.IpfsCluster,
-) error {
-	// do nothing
-	if len(instance.Status.CircuitRelays) >= int(instance.Spec.Networking.CircuitRelays) {
-		// FIXME: handle scale-down of circuit relays
-		return nil
-	}
-	// create the CircuitRelays
-	for i := 0; int32(i) < instance.Spec.Networking.CircuitRelays; i++ {
-		name := fmt.Sprintf("%s-%d", instance.Name, i)
-		relay := clusterv1alpha1.CircuitRelay{}
-		relay.Name = name
-		relay.Namespace = instance.Namespace
-		if err := ctrl.SetControllerReference(instance, &relay, r.Scheme); err != nil {
-			return fmt.Errorf(
-				"cannot set controller reference for new circuitRelay: %w, circuitRelay: %s",
-				err, relay.Name,
-			)
-		}
-		if err := r.Create(ctx, &relay); err != nil {
-			return fmt.Errorf("cannot create new circuitRelay: %w", err)
-		}
-		instance.Status.CircuitRelays = append(instance.Status.CircuitRelays, relay.Name)
-	}
-	if err := r.Status().Update(ctx, instance); err != nil {
-		return err
-	}
-	return nil
-}
-
 // SetupWithManager sets up the controller with the Manager.
 func (r *IpfsClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
@@ -232,4 +171,23 @@ func (r *IpfsClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: 1,
 		}).Complete(r)
+}
+
+func getBootstrapAddrs(secret *corev1.Secret, relayPeers []peer.AddrInfo) ([]string, error) {
+	bootstrapPeers := []string{}
+	peer0IDKey := KeyPeerIDPrefix + "0"
+	peer0ID, ok := secret.Data[peer0IDKey]
+	if !ok {
+		return nil, fmt.Errorf("could not retrieve initial peer id")
+	}
+	initPeerID := string(peer0ID)
+	// construct a p2p circuit here
+	for _, peer := range relayPeers {
+		circuitID := peer.ID
+		for _, circuitAddr := range peer.Addrs {
+			bootstrapAddr := fmt.Sprintf("%s/p2p/%s/p2p-circuit/p2p/%s", circuitAddr.String(), circuitID.String(), initPeerID)
+			bootstrapPeers = append(bootstrapPeers, bootstrapAddr)
+		}
+	}
+	return bootstrapPeers, nil
 }

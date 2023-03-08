@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -10,32 +11,25 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	peer "github.com/libp2p/go-libp2p/core/peer"
 	clusterv1alpha1 "github.com/redhat-et/ipfs-operator/api/v1alpha1"
+	"github.com/redhat-et/ipfs-operator/controllers/utils"
 )
 
 const (
-	peerIDPrefix     = "peerID-"
-	privateKeyPrefix = "privateKey-"
+	KeyClusterSecret           = "CLUSTER_SECRET"
+	KeyBootstrapPeerPrivateKey = "BOOTSTRAP_PEER_PRIV_KEY"
+	KeyBootstrapPeerID         = "BOOTSTRAP_PEER_ID"
+	KeySwarmKey                = "SWARM_KEY"
+	KeyPeerIDPrefix            = "peerID-"
+	KeyPrivateKeyPrefix        = "privateKey-"
 )
 
-// errorFunc Returns a function which returns the provided
-// error when it is called.
-func errorFunc(err error) controllerutil.MutateFn {
-	return func() error {
-		return err
-	}
-}
-
-func (r *IpfsClusterReconciler) SecretConfig(
+func (r *IpfsClusterReconciler) EnsureSecretConfig(
 	ctx context.Context,
 	m *clusterv1alpha1.IpfsCluster,
-	sec *corev1.Secret,
-	clusterSecret,
-	bootstrapPrivateKey []byte,
-	peerID string,
-) (controllerutil.MutateFn, string) {
+) (*corev1.Secret, error) {
 	secName := "ipfs-cluster-" + m.Name
 
 	expectedSecret := &corev1.Secret{
@@ -49,21 +43,17 @@ func (r *IpfsClusterReconciler) SecretConfig(
 	if err != nil {
 		// test for unhandled errors
 		if !errors.IsNotFound(err) {
-			return errorFunc(err), ""
+			return nil, fmt.Errorf("could not get secret: %w", err)
 		}
-		// secret is not found.
-		// initialize new secret
-		expectedSecret.Data = make(map[string][]byte, 0)
-		err = generateNewIdentities(expectedSecret, 0, m.Spec.Replicas)
+		err = r.createNewSecret(ctx, m, expectedSecret)
 		if err != nil {
-			return errorFunc(err), ""
+			return nil, fmt.Errorf("could not create new secret: %w", err)
 		}
-		expectedSecret.Data["CLUSTER_SECRET"] = clusterSecret
-		expectedSecret.Data["BOOTSTRAP_PEER_PRIV_KEY"] = bootstrapPrivateKey
-		expectedSecret.StringData["BOOTSTRAP_PEER_ID"] = peerID
-	} else {
-		// secret exists.
-		// test if we need to add more identieis
+		return expectedSecret, nil
+	}
+	// secret exists.
+	// test if we need to add more identities
+	op, err := ctrl.CreateOrUpdate(ctx, r.Client, expectedSecret, func() error {
 		numIdentities := countIdentities(expectedSecret)
 		if numIdentities != m.Spec.Replicas {
 			// create more identities if needed, otherwise they will be reused
@@ -72,29 +62,67 @@ func (r *IpfsClusterReconciler) SecretConfig(
 				// create more
 				err = generateNewIdentities(expectedSecret, numIdentities, m.Spec.Replicas)
 				if err != nil {
-					return errorFunc(err), ""
+					return fmt.Errorf("could not generate more identities: %w", err)
 				}
 			}
 		}
+		if ctrlErr := ctrl.SetControllerReference(m, expectedSecret, r.Scheme); ctrlErr != nil {
+			return ctrlErr
+		}
+		return nil
+	})
+	fmt.Printf("completed operation %q on secret\n", op)
+	if err != nil {
+		fmt.Printf("could not update secret on operation: %q\n", op)
+		return nil, fmt.Errorf("could not update secret: %w", err)
+	}
+	fmt.Printf("succeeded updating secret on operation %q\n", op)
+	return expectedSecret, nil
+}
+
+// createNewSecret Attempts to create an entirely new secret containing information relevant to IPFS Cluster.
+func (r *IpfsClusterReconciler) createNewSecret(ctx context.Context, m *clusterv1alpha1.IpfsCluster,
+	secret *corev1.Secret) (err error) {
+	// secret is not found.
+	// initialize new secret
+	secret.Data = make(map[string][]byte, 0)
+	var clusterSecret, bootstrapPrivateKey string
+	var swarmKey string
+	var peerID peer.ID
+
+	// save data in secret
+	if clusterSecret, err = utils.NewClusterSecret(); err != nil {
+		return fmt.Errorf("could not create cluster secret: %w", err)
+	}
+	if peerID, bootstrapPrivateKey, err = utils.GenerateIdentity(); err != nil {
+		return fmt.Errorf("could not create new ipfs identity: %w", err)
+	}
+	err = generateNewIdentities(secret, 0, m.Spec.Replicas)
+	if err != nil {
+		return fmt.Errorf("could not place new identities in secret: %w", err)
+	}
+	if swarmKey, err = utils.NewSwarmKey(); err != nil {
+		return fmt.Errorf("could not create swarm key: %w", err)
 	}
 
-	expectedSecret.DeepCopyInto(sec)
-	// FIXME: catch this error before we run the function being returned
-	if err = ctrl.SetControllerReference(m, sec, r.Scheme); err != nil {
-		return errorFunc(err), ""
+	secret.Data[KeyClusterSecret] = []byte(clusterSecret)
+	secret.Data[KeyBootstrapPeerPrivateKey] = []byte(bootstrapPrivateKey)
+	secret.StringData[KeySwarmKey] = swarmKey
+	secret.StringData[KeyBootstrapPeerID] = peerID.String()
+
+	// ensure reference is set
+	if err = ctrl.SetControllerReference(m, secret, r.Scheme); err != nil {
+		return err
 	}
-	return func() error {
-		sec.Data = expectedSecret.Data
-		sec.StringData = expectedSecret.StringData
-		return nil
-	}, secName
+	err = r.Create(ctx, secret)
+	return
 }
 
 // countIdentities Counts the amount of unique peer identities present in the secret.
 func countIdentities(secret *corev1.Secret) int32 {
 	var count int32
 	for key := range secret.Data {
-		if strings.Contains(key, peerIDPrefix) {
+		if strings.Contains(key, KeyPeerIDPrefix) {
 			count++
 		}
 	}
@@ -109,13 +137,13 @@ func generateNewIdentities(secret *corev1.Secret, start, n int32) error {
 	}
 	for i := start; i < n; i++ {
 		// generate new private key & peer id
-		peerID, privKey, err := generateIdentity()
+		peerID, privKey, err := utils.GenerateIdentity()
 		if err != nil {
 			return err
 		}
-		peerIDKey := peerIDPrefix + strconv.Itoa(int(i))
+		peerIDKey := KeyPeerIDPrefix + strconv.Itoa(int(i))
 		secret.StringData[peerIDKey] = peerID.String()
-		secretKey := privateKeyPrefix + strconv.Itoa(int(i))
+		secretKey := KeyPrivateKeyPrefix + strconv.Itoa(int(i))
 		secret.StringData[secretKey] = privKey
 	}
 	return nil

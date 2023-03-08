@@ -1,5 +1,5 @@
 # set binary versions
-GOLANGCI_VERSION := v1.46.1
+GOLANGCI_VERSION := v1.51.1
 HELM_VERSION := v3.8.2
 KUTTL_VERSION := 0.15.0
 GINKGO_VERSION := v2.7.0
@@ -105,6 +105,7 @@ help: ## Display this help.
 .PHONY: manifests
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+	cp config/crd/bases/* helm/ipfs-operator/crds
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
@@ -157,6 +158,7 @@ run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./main.go
 
 .PHONY: docker-build
+# docker build -t ${IMG} . --build-arg arch=$(ARCH) --build-arg platform=$(OS)
 docker-build: ## Build docker image with the manager.
 	docker build -t ${IMG} .
 
@@ -320,6 +322,17 @@ chmod a+x "$(1)" ;\
 }
 endef
 
+# download-tool will curl any file $2 and install it to $1, using $3 as an output directory.
+define download-helm
+@[ -f $(1) ] || { \
+set -e ;\
+echo "📥 Downloading $(2)" ;\
+curl -sSLo "$(1).tar.gz" "$(2)" ;\
+tar -zxvf "$(1).tar.gz" -C "$(3)" ;\
+mv "$(3)/linux-amd64/helm" "$(1)" ;\
+}
+endef
+
 .PHONY: kuttl
 KUTTL := $(LOCALBIN)/kuttl
 KUTTL_URL := https://github.com/kudobuilder/kuttl/releases/download/v$(KUTTL_VERSION)/kubectl-kuttl_$(KUTTL_VERSION)_$(OS)_$(SYS_ARCH)
@@ -347,7 +360,7 @@ HELM := $(LOCALBIN)/helm
 HELM_URL := https://get.helm.sh/helm-$(HELM_VERSION)-$(OS)-$(ARCH).tar.gz
 helm: $(HELM) ## Install helm
 $(HELM): $(LOCALBIN)
-	$(call download-tool,$(HELM),$(HELM_URL))
+	$(call download-helm,$(HELM),$(HELM_URL),$(LOCALBIN))
 
 
 .PHONY: golangci-lint

@@ -2,9 +2,17 @@ package utils
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
+	"encoding/hex"
+	"fmt"
 
 	"github.com/alecthomas/units"
 	"github.com/go-logr/logr"
+
+	ci "github.com/libp2p/go-libp2p/core/crypto"
+
+	peer "github.com/libp2p/go-libp2p/core/peer"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -77,5 +85,66 @@ func IPFSContainerResources(ipfsStorageBytes int64) (ipfsResources corev1.Resour
 			corev1.ResourceCPU:    *ipfsCoresMaxQuantity,
 		},
 	}
+	return
+}
+
+// randomKey Returns a cryptographically-secure generated key.
+func randomKey(len int) (buf []byte, err error) {
+	buf = make([]byte, len)
+	if _, err = rand.Read(buf); err != nil {
+		return nil, err
+	}
+	return buf, nil
+}
+
+// NewClusterSecret Returns a new IPFS Cluster secret.
+func NewClusterSecret() (string, error) {
+	buf, err := randomKey(32)
+	if err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(buf), nil
+}
+
+// NewSwarmKey Generates and returns a key used for hosting a private swarm.
+func NewSwarmKey() (string, error) {
+	const swarmPrefix = "/key/swarm/psk/1.0.0"
+	const multiBase = "/base16/"
+	buf, err := randomKey(32)
+	if err != nil {
+		return "", err
+	}
+	key := hex.EncodeToString(buf)
+	swarmKey := fmt.Sprintf("%s\n%s\n%s", swarmPrefix, multiBase, key)
+	return swarmKey, nil
+}
+
+// NewKey Generates a new private key and returns that along with the identity.
+func NewKey() (ci.PrivKey, peer.ID, error) {
+	const edDSAKeyLen = 4096
+	priv, pub, err := ci.GenerateKeyPair(ci.Ed25519, edDSAKeyLen)
+	if err != nil {
+		return nil, "", err
+	}
+	peerid, err := peer.IDFromPublicKey(pub)
+	if err != nil {
+		return nil, "", err
+	}
+	return priv, peerid, nil
+}
+
+// GenerateIdentity Generates a new key and returns the peer ID and private key
+// encoded as a base64 string using standard encoding, or an error if the key could not be generated.
+func GenerateIdentity() (peerid peer.ID, privStr string, err error) {
+	var privateKey ci.PrivKey
+	privateKey, peerid, err = NewKey()
+	if err != nil {
+		return "", "", fmt.Errorf("cannot generate new key: %w", err)
+	}
+	privBytes, err := ci.MarshalPrivateKey(privateKey)
+	if err != nil {
+		return "", "", fmt.Errorf("cannot get bytes from private key: %w", err)
+	}
+	privStr = base64.StdEncoding.EncodeToString(privBytes)
 	return
 }
